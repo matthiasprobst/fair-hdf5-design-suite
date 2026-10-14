@@ -2,9 +2,6 @@
 
 A research prototype for visually designing experiment workflows and HDF5 target structures for fluid-mechanics data. The React and TypeScript interface is backed by a Python API using FastAPI, h5py, RDFLib, and SHACL.
 
-The image is a design reference, not a screenshot of the running application.
-
-
 ## What it does
 
 - Build experiment workflows from equipment, sensor, processing, metadata, HDF5 group, and dataset blocks.
@@ -23,12 +20,51 @@ Validation checks the HDF5 structure, datatypes, shapes, and configured metadata
 
 The files in `examples/` are examples. In particular, `simulate_processing.py` and `synthetic_measured_data.h5` use synthetic data and are not experimental measurements.
 
-## Requirements
+## Run with Docker (recommended)
+
+Install Docker with Docker Compose support (for example, Docker Desktop), then
+clone or download this repository. From the repository root, run:
+
+```bash
+docker compose up --build
+```
+
+Open <http://localhost:8000>. Docker builds the React frontend and runs it with
+the Python API in one container. You do not need Python, Node.js, or npm on your
+computer. The first build needs internet access to download the base images and
+dependencies and may take a few minutes. The app is exposed only on your local
+computer.
+
+After downloading project updates, run `docker compose up --build` again to
+rebuild and start the updated application. To run in the background, use
+`docker compose up --build -d`.
+
+View service status and logs:
+
+```bash
+docker compose ps
+docker compose logs -f app
+```
+
+To stop the foreground process, press Ctrl+C. To stop and remove the container:
+
+```bash
+docker compose down
+```
+
+Drafts are saved in your browser's local storage, associated with the address you
+use to open the app. Restarting or rebuilding the container does not delete them.
+Use blueprint JSON export to back up or transfer your work; clearing browser data
+removes locally saved drafts. No Docker volumes are required.
+
+## Local development without Docker
+
+The following tools are needed only when running the application directly:
 
 - Python 3.10 or newer
 - Node.js 20 or newer and npm
 
-## Run in development
+### Start the development servers
 
 From the repository root, create and activate a virtual environment, then install the Python dependencies:
 
@@ -56,7 +92,7 @@ npm run dev
 
 Open <http://127.0.0.1:5173>. Vite forwards API requests to the Python server at <http://127.0.0.1:8000>.
 
-## Build and serve locally
+### Build and serve locally
 
 Build the React application, then start the Python server from the repository root:
 
