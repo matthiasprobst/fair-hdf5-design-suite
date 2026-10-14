@@ -1,0 +1,217 @@
+@prefix h5: <https://w3id.org/fair-hdf5-designer/demo/hdf5#> .
+@prefix meta: <https://w3id.org/fair-hdf5-designer/demo/metadata#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/daq> a sh:NodeShape ;
+    sh:property [ sh:minCount 1 ;
+            sh:path meta:sampling_rate_hz ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/data-acquisition" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "/experiment/acquisition/daq_01" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:minCount 1 ;
+            sh:path meta:system ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/daq> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/data-acquisition> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/fan> a sh:NodeShape ;
+    sh:property [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/fan" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:minCount 1 ;
+            sh:path meta:manufacturer ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:model ],
+        [ sh:hasValue "/experiment/equipment/fan" ;
+            sh:minCount 1 ;
+            sh:path h5:path ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/fan> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/fan> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/metadata> a sh:NodeShape ;
+    sh:property [ sh:minCount 1 ;
+            sh:path meta:experiment_date ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:operator ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/experiment-metadata" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "/experiment/metadata" ;
+            sh:minCount 1 ;
+            sh:path h5:path ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/metadata> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/experiment-metadata> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/pressure> a sh:NodeShape ;
+    sh:property [ sh:hasValue "/experiment/instrumentation/pressure_01" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "Pa" ;
+            sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:hasValue "pressure" ;
+            sh:minCount 1 ;
+            sh:path meta:quantity ],
+        [ sh:minCount 1 ;
+            sh:path meta:serial_number ],
+        [ sh:minCount 1 ;
+            sh:path meta:manufacturer ],
+        [ sh:minCount 1 ;
+            sh:path meta:calibration_date ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/pressure-sensor" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/pressure> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/pressure-sensor> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/pressure_data> a sh:NodeShape ;
+    sh:property [ sh:hasValue "dataset" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:quantity ],
+        [ sh:hasValue "Pa" ;
+            sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "/experiment/measurements/pressure" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "pressure" ;
+            sh:minCount 1 ;
+            sh:path meta:quantity ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/dataset" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "0" ;
+            sh:minCount 1 ;
+            sh:path h5:shape ],
+        [ sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "float64" ;
+            sh:minCount 1 ;
+            sh:path h5:dtype ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/pressure_data> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/dataset> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/process> a sh:NodeShape ;
+    sh:property [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:method ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/processing" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "/experiment/processing/write_to_hdf5" ;
+            sh:minCount 1 ;
+            sh:path h5:path ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/process> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/processing> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/root> a sh:NodeShape ;
+    sh:property [ sh:hasValue "/experiment" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/group" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/root> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/group> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/temperature> a sh:NodeShape ;
+    sh:property [ sh:hasValue "/experiment/instrumentation/temperature_01" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "K" ;
+            sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:serial_number ],
+        [ sh:minCount 1 ;
+            sh:path meta:manufacturer ],
+        [ sh:minCount 1 ;
+            sh:path meta:calibration_date ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/temperature-sensor" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "temperature" ;
+            sh:minCount 1 ;
+            sh:path meta:quantity ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/temperature> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/temperature-sensor> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/torque> a sh:NodeShape ;
+    sh:property [ sh:hasValue "group" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:minCount 1 ;
+            sh:path meta:calibration_date ],
+        [ sh:hasValue "/experiment/instrumentation/torque_01" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/torque-sensor" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "N m" ;
+            sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "torque" ;
+            sh:minCount 1 ;
+            sh:path meta:quantity ],
+        [ sh:minCount 1 ;
+            sh:path meta:manufacturer ],
+        [ sh:minCount 1 ;
+            sh:path meta:serial_number ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/torque> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/torque-sensor> .
+
+<https://w3id.org/fair-hdf5-designer/demo/shape/velocity> a sh:NodeShape ;
+    sh:property [ sh:hasValue "/experiment/measurements/velocity" ;
+            sh:minCount 1 ;
+            sh:path h5:path ],
+        [ sh:hasValue "dataset" ;
+            sh:minCount 1 ;
+            sh:path h5:kind ],
+        [ sh:hasValue "float64" ;
+            sh:minCount 1 ;
+            sh:path h5:dtype ],
+        [ sh:hasValue "velocity" ;
+            sh:minCount 1 ;
+            sh:path meta:quantity ],
+        [ sh:hasValue "m/s" ;
+            sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:hasValue "https://w3id.org/fair-hdf5-designer/demo/profiles/dataset" ;
+            sh:minCount 1 ;
+            sh:path h5:profile ],
+        [ sh:hasValue "0" ;
+            sh:minCount 1 ;
+            sh:path h5:shape ],
+        [ sh:minCount 1 ;
+            sh:path meta:unit ],
+        [ sh:minCount 1 ;
+            sh:path meta:quantity ] ;
+    sh:targetNode <https://w3id.org/fair-hdf5-designer/demo/node/velocity> ;
+    h5:profileSource <https://w3id.org/fair-hdf5-designer/demo/profiles/dataset> .
+

@@ -1,0 +1,204 @@
+{
+  "name": "Radial fan experiment",
+  "version": "0.1",
+  "nodes": [
+    {
+      "id": "fan",
+      "type": "fan",
+      "label": "Radial Fan",
+      "x": 60,
+      "y": 270,
+      "config": {
+        "path": "/experiment/equipment/fan",
+        "model": "RF-120",
+        "manufacturer": "Lab demonstrator"
+      }
+    },
+    {
+      "id": "pressure",
+      "type": "pressure_sensor",
+      "label": "Pressure Sensor",
+      "x": 310,
+      "y": 104,
+      "config": {
+        "path": "/experiment/instrumentation/pressure_01",
+        "quantity": "pressure",
+        "unit": "Pa",
+        "manufacturer": "Demo Instruments",
+        "serial_number": "P-001",
+        "calibration_date": "2026-02-01"
+      }
+    },
+    {
+      "id": "temperature",
+      "type": "temperature_sensor",
+      "label": "Temperature Sensor",
+      "x": 310,
+      "y": 288,
+      "config": {
+        "path": "/experiment/instrumentation/temperature_01",
+        "quantity": "temperature",
+        "unit": "K",
+        "manufacturer": "Demo Instruments",
+        "serial_number": "T-002",
+        "calibration_date": "2026-02-01"
+      }
+    },
+    {
+      "id": "torque",
+      "type": "torque_sensor",
+      "label": "Torque Sensor",
+      "x": 310,
+      "y": 472,
+      "config": {
+        "path": "/experiment/instrumentation/torque_01",
+        "quantity": "torque",
+        "unit": "N m",
+        "manufacturer": "Demo Instruments",
+        "serial_number": "Q-003",
+        "calibration_date": "2026-02-01"
+      }
+    },
+    {
+      "id": "daq",
+      "type": "daq",
+      "label": "DAQ / Logger",
+      "x": 602,
+      "y": 268,
+      "config": {
+        "path": "/experiment/acquisition/daq_01",
+        "system": "Python acquisition",
+        "sampling_rate_hz": "1000"
+      }
+    },
+    {
+      "id": "process",
+      "type": "process",
+      "label": "Write to HDF5",
+      "x": 876,
+      "y": 270,
+      "config": {
+        "path": "/experiment/processing/write_to_hdf5",
+        "method": "Acquire and write measurements"
+      }
+    },
+    {
+      "id": "root",
+      "type": "group",
+      "label": "Experiment Group",
+      "x": 1170,
+      "y": 92,
+      "config": {
+        "path": "/experiment"
+      }
+    },
+    {
+      "id": "velocity",
+      "type": "dataset",
+      "label": "Velocity Dataset",
+      "x": 1170,
+      "y": 272,
+      "config": {
+        "path": "/experiment/measurements/velocity",
+        "quantity": "velocity",
+        "unit": "m/s",
+        "dtype": "float64",
+        "shape": "0"
+      }
+    },
+    {
+      "id": "pressure_data",
+      "type": "dataset",
+      "label": "Pressure Dataset",
+      "x": 1170,
+      "y": 453,
+      "config": {
+        "path": "/experiment/measurements/pressure",
+        "quantity": "pressure",
+        "unit": "Pa",
+        "dtype": "float64",
+        "shape": "0"
+      }
+    },
+    {
+      "id": "metadata",
+      "type": "metadata",
+      "label": "Experiment Metadata",
+      "x": 865,
+      "y": 528,
+      "config": {
+        "path": "/experiment/metadata",
+        "operator": "Lab researcher",
+        "experiment_date": "2026-10-13"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_fan_pressure",
+      "source": "fan",
+      "target": "pressure",
+      "relation": "instrumented_by"
+    },
+    {
+      "id": "e_fan_temperature",
+      "source": "fan",
+      "target": "temperature",
+      "relation": "instrumented_by"
+    },
+    {
+      "id": "e_fan_torque",
+      "source": "fan",
+      "target": "torque",
+      "relation": "instrumented_by"
+    },
+    {
+      "id": "e_pressure_daq",
+      "source": "pressure",
+      "target": "daq",
+      "relation": "acquired_by"
+    },
+    {
+      "id": "e_temperature_daq",
+      "source": "temperature",
+      "target": "daq",
+      "relation": "acquired_by"
+    },
+    {
+      "id": "e_torque_daq",
+      "source": "torque",
+      "target": "daq",
+      "relation": "acquired_by"
+    },
+    {
+      "id": "e_daq_process",
+      "source": "daq",
+      "target": "process",
+      "relation": "processed_by"
+    },
+    {
+      "id": "e_process_root",
+      "source": "process",
+      "target": "root",
+      "relation": "writes_to"
+    },
+    {
+      "id": "e_process_velocity",
+      "source": "process",
+      "target": "velocity",
+      "relation": "writes_to"
+    },
+    {
+      "id": "e_process_pressure_data",
+      "source": "process",
+      "target": "pressure_data",
+      "relation": "writes_to"
+    },
+    {
+      "id": "e_metadata_root",
+      "source": "metadata",
+      "target": "root",
+      "relation": "describes"
+    }
+  ]
+}

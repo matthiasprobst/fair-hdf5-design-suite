@@ -2,8 +2,6 @@
 
 A research prototype for visually designing experiment workflows and HDF5 target structures for fluid-mechanics data. The React and TypeScript interface is backed by a Python API using FastAPI, h5py, RDFLib, and SHACL.
 
-![UI design reference](frontend/public/ui-reference.png)
-
 The image is a design reference, not a screenshot of the running application.
 
 
