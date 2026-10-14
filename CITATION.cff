@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "FAIR HDF5 Design Suite"
+authors:
+  - family-names: Probst
+    given-names: Matthias
+version: "2.0.0"
+date-released: 2026-10-14
+license: Apache-2.0
+type: software
+abstract: >-
+  A visual tool for designing HDF5 target structures for fluid-mechanics
+  research data, with a React and TypeScript frontend and a Python backend.
