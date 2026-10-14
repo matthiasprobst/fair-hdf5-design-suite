@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from backend import CATALOG, demo, hdf5_template, shacl_turtle, structure_preview, validate_hdf5
 
 HERE = Path(__file__).resolve().parent
-app = FastAPI(title="FAIR HDF5 Design Suite", version="2.0.0")
+app = FastAPI(title="FAIR HDF5 Design Suite", version="0.1.0-beta.1")
 # React's production bundle is served by FastAPI after npm run build.
 FRONTEND_DIST = HERE / "frontend" / "dist"
 if (FRONTEND_DIST / "assets").exists():
@@ -42,7 +42,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.0.0", "react_built": (FRONTEND_DIST / "index.html").exists()}
+    return {"status": "ok", "version": app.version, "react_built": (FRONTEND_DIST / "index.html").exists()}
 
 
 @app.get("/api/catalog")

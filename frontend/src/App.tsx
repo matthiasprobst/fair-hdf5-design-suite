@@ -126,7 +126,7 @@ function Workbench(){
      {inspectorOpen?<EditorInspector onClose={()=>setInspectorOpen(false)} onNotice={onNotice}/>:<button className="inspector-reopen" onClick={()=>setInspectorOpen(true)}><SlidersHorizontal size={16}/> Open inspector</button>}
    </div>
    <Artifacts previewStatus={artifactState.preview.status} validationStatus={artifactState.validation.status} preview={preview} validation={validation} busy={busy} onRefresh={refresh} onShaclPreview={previewShacl} onShaclDownload={exportShacl} onStructure={previewStructure} onHdf5Download={exportHdf5} onValidation={()=>runValidation()} onReport={()=>setDialog('validation')}/>
-   <div className="statusbar"><span><CircleCheck size={12}/> Python API connected</span><span><Code2 size={12}/> Local illustrative metadata profiles · No live MPS connection</span><span>Research prototype v2.0</span></div>
+   <div className="statusbar"><span><CircleCheck size={12}/> Python API connected</span><span><Code2 size={12}/> Local illustrative metadata profiles · No live MPS connection</span><span>Research prototype 0.1.0-beta.1</span></div>
    <input type="file" accept=".json,application/json" hidden ref={importRef} onChange={e=>{void importBlueprint(e);}}/>
    <input type="file" accept=".h5,.hdf5,application/x-hdf5" hidden ref={uploadRef} onChange={e=>{const f=e.target.files?.[0];if(f)runValidation(f);e.target.value='';}}/>
    {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role="status">{notice.error?<CircleHelp size={16}/>:<CircleCheck size={16}/>} {notice.text}<button onClick={()=>setNotice(null)}><X size={13}/></button></div>}

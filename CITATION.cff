@@ -4,8 +4,7 @@ title: "FAIR HDF5 Design Suite"
 authors:
   - family-names: Probst
     given-names: Matthias
-version: "2.0.0"
-date-released: 2026-10-14
+version: "0.1.0-beta.1"
 license: Apache-2.0
 type: software
 abstract: >-

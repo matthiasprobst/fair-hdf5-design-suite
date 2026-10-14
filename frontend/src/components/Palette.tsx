@@ -40,6 +40,6 @@ export default function Palette({catalog,onAdd}:Props){
         <span><strong>Profile library</strong><small>Local example profiles; future NFDI4Ing MPS integration</small></span>
       </div>
     </div>
-    <div className="palette-foot"><span className="live-dot"/> Local component catalog <span className="mini-version">v2</span></div>
+    <div className="palette-foot"><span className="live-dot"/> Local component catalog <span className="mini-version">Beta</span></div>
   </aside>;
 }
