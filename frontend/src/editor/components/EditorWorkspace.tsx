@@ -1,0 +1,105 @@
+import { useCallback, useRef, useState } from 'react';
+import type { DragEvent, ReactNode } from 'react';
+import { useReactFlow } from '@xyflow/react';
+import { SlidersHorizontal } from 'lucide-react';
+import type { NodeType } from '../../types';
+import Palette from '../../components/Palette';
+import { EditorInspector } from '../../components/EditorInspector';
+import { Canvas, CanvasErrorBoundary } from '../../components/Canvas';
+import { WorkbenchLayout } from '../../layout/WorkbenchLayout';
+import { useWorkbenchPanels } from '../../layout/useWorkbenchPanels';
+import { editorStore, useEditor } from '../store';
+import { CanvasHeading } from './CanvasHeading';
+
+type Props = {
+  artifacts: ReactNode;
+  onNotice: (text: string, error?: boolean) => void;
+  previewStructure: () => void;
+};
+
+export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props) {
+  const catalog = useEditor((state) => state.catalog);
+  const panels = useWorkbenchPanels();
+  const { showInspector } = panels;
+  const [showMinimap, setShowMinimap] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const flow = useReactFlow();
+
+  const addNode = useCallback(
+    (type: NodeType, x: number, y: number) => {
+      if (editorStore.getState().nodes.length >= 250) {
+        onNotice('The blueprint limit is 250 blocks.', true);
+        return;
+      }
+      editorStore.getState().addNode(type, x, y);
+      showInspector();
+    },
+    [onNotice, showInspector],
+  );
+
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const type =
+        event.dataTransfer.getData('application/x-fair-component') ||
+        event.dataTransfer.getData('text/plain');
+      if (!Object.prototype.hasOwnProperty.call(catalog, type)) return;
+      const position = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addNode(type as NodeType, position.x - 95, position.y - 38);
+    },
+    [catalog, flow, addNode],
+  );
+
+  const addFromLibrary = (type: NodeType) => {
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    const position = bounds
+      ? flow.screenToFlowPosition({
+          x: bounds.left + bounds.width * 0.48,
+          y: bounds.top + bounds.height * 0.43,
+        })
+      : { x: 80, y: 100 };
+    addNode(type, position.x - 80, position.y - 35);
+  };
+
+  return (
+    <WorkbenchLayout
+      panels={panels}
+      library={
+        <Palette
+          catalog={catalog}
+          onAdd={addFromLibrary}
+          onClose={panels.compact ? () => panels.close('library') : undefined}
+        />
+      }
+      inspector={<EditorInspector onClose={() => panels.close('inspector')} onNotice={onNotice} />}
+      artifacts={artifacts}
+      canvas={
+        <section className="canvas-shell" aria-label="Design canvas">
+          <CanvasHeading
+            panels={panels}
+            showMinimap={showMinimap}
+            toggleMinimap={() => setShowMinimap((value) => !value)}
+            previewStructure={previewStructure}
+          />
+          <div
+            className="canvas-region"
+            ref={canvasRef}
+            onDrop={onDrop}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'copy';
+            }}
+          >
+            <CanvasErrorBoundary>
+              <Canvas showMinimap={showMinimap} onSelection={showInspector} />
+            </CanvasErrorBoundary>
+            <div className="canvas-corner-note">
+              <SlidersHorizontal size={13} /> Connect blocks using the round ports · Drag blocks
+              from library
+            </div>
+          </div>
+        </section>
+      }
+    />
+  );
+}

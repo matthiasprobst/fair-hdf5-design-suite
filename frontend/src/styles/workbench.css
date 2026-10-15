@@ -1,0 +1,96 @@
+.editor-view {
+  height: 100%;
+  min-height: 549px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f9fbff;
+}
+
+/* One owner for both split axes. These preferred sizes are future resize inputs. */
+.editor-view .workbench-layout {
+  --library-width: 225px;
+  --inspector-width: 333px;
+  --artifacts-height: 213px;
+  --panel-gap: 6px;
+  --canvas-min-height: 240px;
+  flex: 1;
+  min-width: 0;
+  min-height: calc(var(--canvas-min-height) + 160px + var(--panel-gap));
+  display: grid;
+  grid-template-rows: minmax(var(--canvas-min-height), 1fr) clamp(
+      160px,
+      var(--artifacts-height),
+      32%
+    );
+  gap: var(--panel-gap);
+  padding: 0 8px;
+}
+
+.editor-view .main-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--library-width) minmax(0, 1fr) var(--inspector-width);
+  gap: var(--panel-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-view .main-stage[data-inspector-open='false'] {
+  grid-template-columns: var(--library-width) minmax(0, 1fr);
+}
+
+.editor-view .workbench-library,
+.editor-view .workbench-inspector,
+.editor-view .workbench-artifacts {
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-view .workbench-library > .panel-shell,
+.editor-view .workbench-inspector > .panel-shell {
+  height: 100%;
+}
+
+.editor-view .workbench-library[hidden],
+.editor-view .workbench-inspector[hidden] {
+  display: none;
+}
+
+@media (max-width: 1450px) {
+  .editor-view .workbench-layout {
+    --library-width: 206px;
+    --inspector-width: 306px;
+  }
+}
+
+@media (max-height: 850px) {
+  .editor-view .workbench-layout {
+    --artifacts-height: 189px;
+  }
+}
+
+@media (width < 1150px) {
+  .editor-view .main-stage,
+  .editor-view .main-stage[data-inspector-open='false'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-view .workbench-library,
+  .editor-view .workbench-inspector {
+    position: absolute;
+    top: 56px;
+    bottom: 0;
+    width: min(333px, 80%);
+    z-index: 10;
+    box-shadow: 0 8px 25px #17314f30;
+    border-radius: 8px;
+  }
+
+  .editor-view .workbench-library {
+    left: 0;
+  }
+  .editor-view .workbench-inspector {
+    right: 0;
+  }
+}

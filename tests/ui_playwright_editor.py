@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import unittest
@@ -59,9 +60,19 @@ class EditorBrowserTests(unittest.TestCase):
         self.errors = []
         self.expected_http_statuses = set()
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
-        self.page.on('console', lambda msg: self.errors.append(msg.text) if msg.type in ('error', 'warning') and not any(f'status of {code}' in msg.text for code in self.expected_http_statuses) else None)
+        self.page.on('console', self.check_console)
         self.preview_requests = []
         self.page.on('request', lambda r: self.preview_requests.append(r.post_data) if r.url.endswith('/api/preview') else None)
+
+    def check_console(self, message):
+        # Existing hideAttribution configuration also warns in the unchanged baseline.
+        # Keep this exact library notice separate from runtime/layout warnings.
+        if message.type == 'warning' and message.text.startswith(
+                'React Flow: It seems like you are hiding the attribution.'):
+            return
+        if message.type in ('error', 'warning') and not any(
+                f'status of {code}' in message.text for code in self.expected_http_statuses):
+            self.errors.append(message.text)
 
     def tearDown(self):
         try:
@@ -127,7 +138,11 @@ class EditorBrowserTests(unittest.TestCase):
         viewport = self.viewport()
         self.page.mouse.move(box['x']+box['width']/2, box['y']+box['height']/2)
         self.page.mouse.down()
-        self.page.mouse.move(box['x']+box['width']/2+dx, box['y']+box['height']/2+dy, steps=12)
+        # Cross React Flow's activation threshold before measuring the actual drag.
+        # At low zoom, counting that dead zone as node movement makes this helper fail
+        # even on the unchanged frontend (e.g. the 250-node graph).
+        self.page.mouse.move(box['x']+box['width']/2+4, box['y']+box['height']/2)
+        self.page.mouse.move(box['x']+box['width']/2+4+dx, box['y']+box['height']/2+dy, steps=12)
         self.page.mouse.up()
         self.page.wait_for_function('''([id,x])=>new DOMMatrix(document.querySelector(`.react-flow__node[data-id="${id}"]`).style.transform).m41!==x''', arg=[id, old['x']])
         self.wait_saved()
@@ -337,6 +352,177 @@ class EditorBrowserTests(unittest.TestCase):
         self.assertEqual(set(exported),{'name','version','nodes','edges'})
         for node in exported['nodes']:
             self.assertEqual(set(node),{'id','type','label','x','y','config'})
+
+
+    def assert_layout_bounds(self):
+        dimensions = self.page.evaluate('''() => {
+            const root=document.documentElement;
+            const selectors=['.global-header','.project-toolbar','.main-stage',
+                '.canvas-region','.artifacts-container','.statusbar'];
+            return {documentWidth:root.scrollWidth, width:innerWidth,
+                boxes:selectors.map(selector=>{
+                    const r=document.querySelector(selector).getBoundingClientRect();
+                    return {selector,left:r.left,right:r.right,width:r.width,height:r.height};
+                })};
+        }''')
+        self.assertLessEqual(dimensions['documentWidth'], dimensions['width'])
+        for box in dimensions['boxes']:
+            self.assertGreater(box['width'], 0, box['selector'])
+            self.assertGreater(box['height'], 0, box['selector'])
+            self.assertGreaterEqual(box['left'], 0, box['selector'])
+            self.assertLessEqual(box['right'], dimensions['width'], box['selector'])
+        expect(self.page.locator('vite-error-overlay')).to_have_count(0)
+        self.assertTrue(self.page.locator('.toolbar-buttons').evaluate('''element => {
+            const boxes=[...element.querySelectorAll(':scope > button, :scope > .project-menu-wrap')]
+                .map(e=>e.getBoundingClientRect());
+            return boxes.every((a,i)=>boxes.every((b,j)=>i===j ||
+                a.right<=b.left || b.right<=a.left || a.bottom<=b.top || b.bottom<=a.top));
+        }'''), 'Project actions must not overlap')
+
+    def test_layout_resize_preserves_canvas_and_desktop_preference(self):
+        self.load()
+        self.graph_visible(3)
+        expect(self.page.locator('.artifact-shacl .artifact-status')).to_contain_text('Ready')
+        self.node('fan').locator('.node-title').click()
+        self.page.get_by_title('Zoom out', exact=True).click()
+        self.settled_viewport()
+        # Explicit pan verifies both transform components survive layout changes.
+        canvas = self.page.locator('.canvas-region').bounding_box()
+        self.page.mouse.move(canvas['x']+40, canvas['y']+40)
+        self.page.mouse.down()
+        self.page.mouse.move(canvas['x']+60, canvas['y']+55, steps=5)
+        self.page.mouse.up()
+        self.settled_viewport()
+        transform = self.viewport()
+        saved = self.stored()
+        requests = len(self.preview_requests)
+        canvas_element = self.page.locator('.react-flow').element_handle()
+        width = self.page.locator('.canvas-region').bounding_box()['width']
+        self.page.get_by_role('button', name='Close inspector', exact=True).click()
+        expect(self.page.locator('#workbench-inspector')).to_be_hidden()
+        self.assertGreater(self.page.locator('.canvas-region').bounding_box()['width'], width+250)
+        expect(self.page.get_by_role('button', name='Toggle inspector', exact=True)).to_be_focused()
+        for w,h in [(1440,900),(1150,768),(1149,768),(1024,768),(768,600),(1149,768),(1150,768),(1672,941)]:
+            with self.subTest(viewport=(w,h)):
+                self.page.set_viewport_size({'width':w,'height':h})
+                expect(self.page.locator('.main-stage')).to_have_attribute('data-compact', str(w<1150).lower())
+                self.assert_layout_bounds()
+                self.assertEqual(self.viewport(), transform)
+                self.assertTrue(canvas_element.evaluate('e=>e.isConnected && e===document.querySelector(".react-flow")'))
+                expect(self.node('fan')).to_have_class(re.compile(r'.*selected.*'))
+                expect(self.page.locator('#workbench-inspector')).to_be_hidden()
+                self.assertEqual(self.stored(), saved)
+                self.page.screenshot(path=str(OUT/f'layout-{w}.png'))
+        self.assertEqual(len(self.preview_requests), requests)
+        self.page.get_by_role('button', name='Toggle inspector', exact=True).click()
+        expect(self.page.locator('#workbench-inspector')).to_be_visible()
+        self.assertAlmostEqual(self.page.locator('.canvas-region').bounding_box()['width'], width, delta=1)
+        self.assertEqual(self.viewport(), transform)
+
+    def test_compact_panels_keyboard_add_drag_and_edit(self):
+        self.page.set_viewport_size({'width':768,'height':600})
+        self.load()
+        self.graph_visible(3)
+        library = self.page.get_by_role('button', name='Toggle block library', exact=True)
+        inspector = self.page.get_by_role('button', name='Toggle inspector', exact=True)
+        expect(self.page.locator('#workbench-library')).to_be_hidden()
+        expect(self.page.locator('#workbench-inspector')).to_be_hidden()
+        # The empty inspector can also be closed, without selecting a node first.
+        inspector.click()
+        self.page.get_by_role('button', name='Close inspector', exact=True).click()
+        expect(inspector).to_be_focused()
+        library.focus()
+        self.page.keyboard.press('Enter')
+        expect(library).to_have_attribute('aria-expanded','true')
+        self.page.get_by_label('Search components').fill('Temperature')
+        self.page.keyboard.press('Escape')
+        expect(library).to_be_focused()
+        expect(self.page.locator('#workbench-library')).to_be_hidden()
+        library.click()
+        expect(self.page.get_by_label('Search components')).to_have_value('Temperature')
+        item = self.page.locator('.palette-item').filter(has_text='Temperature sensor')
+        item.hover()
+        self.page.get_by_role('button',name='Add Temperature sensor',exact=True).click()
+        self.graph_visible(4)
+        expect(self.page.locator('#workbench-library')).to_be_hidden()
+        expect(self.page.locator('#workbench-inspector')).to_be_visible()
+        self.page.locator('.form-field').filter(has=self.page.locator('label',has_text='Block name')).locator('input').fill('Compact sensor')
+        self.wait_saved()
+        self.assertEqual(self.stored()['nodes'][-1]['label'], 'Compact sensor')
+        self.page.keyboard.press('Escape')
+        expect(inspector).to_be_focused()
+        library.click()
+        self.page.get_by_label('Search components').fill('Pressure')
+        # The nonmodal panel permits a real drop onto the exposed part of the canvas.
+        canvas=self.page.locator('.canvas-region')
+        box=canvas.bounding_box()
+        self.page.locator('.palette-item').filter(has_text='Pressure sensor').drag_to(
+            canvas, target_position={'x':box['width']*.55,'y':box['height']*.5})
+        self.graph_visible(5)
+        self.wait_saved()
+        expect(self.page.locator('#workbench-inspector')).to_be_visible()
+        self.assertEqual(self.stored()['nodes'][-1]['type'], 'pressure_sensor')
+        self.page.get_by_role('button', name='Close inspector', exact=True).click()
+        # Nodes added after the resize remain movable; use the latest selected node.
+        self.drag_node(self.stored()['nodes'][-1]['id'], 12, -8)
+        self.page.screenshot(path=str(OUT/'compact-editor.png'))
+        # Crossing back restores the original open desktop inspector preference.
+        self.page.set_viewport_size({'width':1440,'height':900})
+        expect(self.page.locator('#workbench-inspector')).to_be_visible()
+        self.page.set_viewport_size({'width':768,'height':600})
+        expect(self.page.locator('#workbench-inspector')).to_be_hidden()
+
+    def test_compact_actions_and_internal_scrolling(self):
+        self.page.set_viewport_size({'width':768,'height':600})
+        blueprint=copy.deepcopy(BASE)
+        blueprint['name']='A long project title ' * 30
+        blueprint['nodes'][0]['label']='VeryLongUnbrokenLabel' * 30
+        blueprint['nodes'][0]['config'].update({f'custom_{i}':'Extensive metadata' * 20 for i in range(50)})
+        self.load(blueprint)
+        self.graph_visible(3)
+        self.assert_layout_bounds()
+        self.page.get_by_role('button',name='Application menu',exact=True).click()
+        self.page.get_by_role('navigation').get_by_role('button',name='Projects',exact=True).click()
+        expect(self.page.get_by_role('dialog')).to_be_visible()
+        self.page.get_by_role('dialog').get_by_role('button',name='Close',exact=True).last.click()
+        self.page.get_by_role('button',name='Project',exact=True).click()
+        expect(self.page.get_by_role('button',name='Import blueprint JSON',exact=True)).to_be_visible()
+        expect(self.page.get_by_role('button',name='Validate existing .h5',exact=True)).to_be_visible()
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role('button',name='Export blueprint JSON',exact=True).click()
+        self.assertEqual(json.loads(Path(transfer.value.path()).read_text()), blueprint)
+        self.node('fan').locator('.node-title').click()
+        expect(self.page.locator('#workbench-inspector')).to_be_visible()
+        self.assert_layout_bounds()
+        self.assertTrue(self.page.locator('.inspector-scroll').evaluate('(e)=>e.scrollHeight>e.clientHeight'))
+        self.page.get_by_role('button',name='Duplicate',exact=True).scroll_into_view_if_needed()
+        self.assertGreater(self.page.locator('.inspector-scroll').evaluate('(e)=>e.scrollTop'), 0)
+        self.page.get_by_role('button',name='Close inspector',exact=True).click()
+        self.page.get_by_role('button',name='Toggle block library',exact=True).click()
+        self.assertTrue(self.page.locator('.palette-scroll').evaluate('(e)=>e.scrollHeight>e.clientHeight'))
+        self.page.locator('.palette-foot').scroll_into_view_if_needed()
+        self.page.get_by_role('button',name='Close block library',exact=True).click()
+        report=self.page.get_by_role('button',name='Run validation',exact=True)
+        report.scroll_into_view_if_needed()
+        self.assertGreater(self.page.locator('.artifacts-grid').evaluate('(e)=>e.scrollTop'), 0)
+        self.assert_layout_bounds()
+        self.page.screenshot(path=str(OUT/'compact-artifacts.png'))
+        # Short windows use the shell's content scroll instead of clipping actions.
+        self.page.set_viewport_size({'width':768,'height':420})
+        self.page.locator('.statusbar').scroll_into_view_if_needed()
+        self.assertGreater(self.page.locator('.app-content').evaluate('(e)=>e.scrollTop'), 0)
+        self.assert_layout_bounds()
+
+    def test_layout_with_long_storage_error(self):
+        self.page.set_viewport_size({'width':768,'height':600})
+        self.page.add_init_script("Storage.prototype.getItem=function(){throw new Error('storage-denied-'.repeat(100))}")
+        self.page.goto(URL)
+        expect(self.page.get_by_role('alert')).to_contain_text('storage-denied')
+        expect(self.page.get_by_role('heading',name='Target HDF5 Design')).to_be_visible()
+        self.assert_layout_bounds()
+        self.assertLessEqual(self.page.get_by_role('alert').bounding_box()['height'],96)
+        self.page.locator('.statusbar').scroll_into_view_if_needed()
+        self.page.screenshot(path=str(OUT/'compact-storage-error.png'))
 
 
 if __name__=='__main__':
