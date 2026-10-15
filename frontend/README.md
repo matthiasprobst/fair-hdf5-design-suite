@@ -11,14 +11,25 @@ commands and generated artifacts to the UI. A future project view can use
 - `WorkbenchLayout` owns the workspace/artifacts split and the
   library/canvas/inspector split. Its named slots accept content, not dimensions.
 - `styles/workbench.css` owns outer panel sizes. The CSS properties
-  `--library-width`, `--inspector-width` and `--artifacts-height` are preferred
-  sizes for the next resize-handle implementation. Keep resizing state local to
-  this layout; do not put it in the blueprint store or its persistence format.
+  `--library-width`, `--inspector-width` and `--artifacts-height` are initial
+  sizes. `useWorkbenchSizing` keeps user sizes local to this layout; do not put them in the blueprint store or its persistence format.
 - `styles/editor.css` contains editor-scoped presentation and internal scrolling.
   Panels fill their allocated space. Keep `min-width: 0` and `min-height: 0`
   throughout the grid/flex chain, and keep scrolling in the panel content.
 - `styles/shell.css` is independent of the editor. Global `styles.css` contains
   only base document styles.
+
+Library, inspector and artifacts can be collapsed independently using their
+header controls or the canvas toolbar. Closing a panel preserves its size for
+reopening during the current session. Sizes are intentionally not persisted.
+`panelSizes.ts` reserves at least 360px for the desktop canvas and 240px for the
+workspace height. Sidebar widths are clamped to the available space on browser
+resize, while retaining the user's preferred sizes for a larger window.
+
+`ResizeHandle` uses pointer capture and supports mouse, touch and keyboard:
+arrow keys move the divider by 10px (Shift: 50px), Home/End reach the limits,
+Escape cancels an active drag, and double-click restores the responsive default.
+Compact overlays can also be resized. React Flow is never remounted by resizing.
 
 The supported viewport starts at 768 × 600. Below 1150px, side panels become
 nonmodal overlays above the canvas. Only one overlay is open at a time; entering

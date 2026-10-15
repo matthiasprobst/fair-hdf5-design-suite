@@ -525,5 +525,112 @@ class EditorBrowserTests(unittest.TestCase):
         self.page.screenshot(path=str(OUT/'compact-storage-error.png'))
 
 
+    def resize_panel(self, label, dx, dy):
+        handle = self.page.get_by_role('separator', name=label, exact=True)
+        box = handle.bounding_box()
+        self.page.mouse.move(box['x']+box['width']/2, box['y']+box['height']/2)
+        self.page.mouse.down()
+        self.page.mouse.move(box['x']+box['width']/2+dx, box['y']+box['height']/2+dy, steps=10)
+        self.page.mouse.up()
+
+    def test_resize_and_collapse_all_panels_preserves_graph_and_sizes(self):
+        self.load()
+        self.graph_visible(3)
+        expect(self.page.locator('.artifact-shacl .artifact-status')).to_contain_text('Ready')
+        canvas = self.page.locator('.react-flow').element_handle()
+        transform = self.viewport()
+        saved = self.stored()
+        requests = len(self.preview_requests)
+        measurements = {}
+        for panel,label,dx,dy,dimension in [
+                ('library','Resize block library',80,0,'width'),
+                ('inspector','Resize inspector',-60,0,'width'),
+                ('artifacts','Resize generated artifacts',0,-70,'height')]:
+            region = self.page.locator(f'#workbench-{panel}')
+            before = region.bounding_box()[dimension]
+            self.resize_panel(label,dx,dy)
+            size = region.bounding_box()[dimension]
+            self.assertAlmostEqual(size-before,abs(dx or dy),delta=2)
+            measurements[panel] = size
+            self.assertEqual(self.viewport(),transform)
+        for panel,button in [('library','Toggle block library'),('inspector','Toggle inspector'),('artifacts','Toggle generated artifacts')]:
+            self.page.get_by_role('button',name=button,exact=True).click()
+            expect(self.page.locator(f'#workbench-{panel}')).to_be_hidden()
+        expect(self.page.get_by_role('separator')).to_have_count(0)
+        expect(self.page.get_by_role('button',name='Expand generated artifacts')).to_be_visible()
+        self.assertGreater(self.page.locator('.canvas-region').bounding_box()['width'],1600)
+        for panel,button,dimension in [('library','Toggle block library','width'),('inspector','Toggle inspector','width'),('artifacts','Expand generated artifacts','height')]:
+            self.page.get_by_role('button',name=button,exact=True).click()
+            self.assertAlmostEqual(self.page.locator(f'#workbench-{panel}').bounding_box()[dimension],measurements[panel],delta=1)
+        self.assertTrue(canvas.evaluate('e=>e.isConnected && e===document.querySelector(".react-flow")'))
+        self.assertEqual(self.viewport(),transform)
+        self.assertEqual(self.stored(),saved)
+        self.assertEqual(len(self.preview_requests),requests)
+        self.assert_layout_bounds()
+        self.page.screenshot(path=str(OUT/'resized-panels.png'))
+        # Each panel can be collapsed from its own header, too.
+        self.page.get_by_role('button',name='Close block library',exact=True).click()
+        self.page.get_by_role('button',name='Close inspector',exact=True).click()
+        self.page.get_by_role('button',name='Collapse generated artifacts',exact=True).click()
+        expect(self.page.get_by_role('separator')).to_have_count(0)
+        self.page.screenshot(path=str(OUT/'collapsed-panels.png'))
+
+    def test_resize_keyboard_limits_cancel_and_window_resize(self):
+        self.load()
+        self.graph_visible(3)
+        self.page.set_viewport_size({'width':1150,'height':768})
+        handle=self.page.get_by_role('separator',name='Resize block library',exact=True)
+        handle.focus()
+        initial=float(handle.get_attribute('aria-valuenow'))
+        self.page.keyboard.press('ArrowRight')
+        self.assertAlmostEqual(float(handle.get_attribute('aria-valuenow')),initial+10,delta=1)
+        self.page.keyboard.press('Home')
+        expect(handle).to_have_attribute('aria-valuenow','180')
+        self.page.keyboard.press('End')
+        self.page.get_by_role('separator',name='Resize inspector',exact=True).focus()
+        self.page.keyboard.press('End')
+        self.assertGreaterEqual(self.page.locator('.canvas-shell').bounding_box()['width'],359)
+        self.assert_layout_bounds()
+        # Cancelling an active pointer drag restores the starting width.
+        handle.focus()
+        box=handle.bounding_box()
+        start=float(handle.get_attribute('aria-valuenow'))
+        self.page.mouse.move(box['x']+3,box['y']+40)
+        self.page.mouse.down()
+        self.page.mouse.move(box['x']-40,box['y']+40,steps=5)
+        self.page.keyboard.press('Escape')
+        self.page.mouse.up()
+        self.assertAlmostEqual(float(handle.get_attribute('aria-valuenow')),start,delta=1)
+        handle.dblclick()
+        expect(handle).to_have_attribute('aria-valuenow','206')
+        self.page.set_viewport_size({'width':1672,'height':941})
+        expect(handle).to_have_attribute('aria-valuenow','225')
+        self.page.get_by_role('separator',name='Resize generated artifacts',exact=True).focus()
+        self.page.keyboard.press('End')
+        self.assertGreaterEqual(self.page.locator('.main-stage').bounding_box()['height'],239)
+        self.page.set_viewport_size({'width':1150,'height':600})
+        self.assertGreaterEqual(self.page.locator('.main-stage').bounding_box()['height'],239)
+        self.assert_layout_bounds()
+
+    def test_compact_overlay_resize_and_close_retains_preference(self):
+        self.page.set_viewport_size({'width':768,'height':600})
+        self.load()
+        self.graph_visible(3)
+        self.page.get_by_role('button',name='Toggle block library',exact=True).click()
+        self.resize_panel('Resize block library',50,0)
+        self.assertAlmostEqual(self.page.locator('#workbench-library').bounding_box()['width'],383,delta=1)
+        self.page.get_by_role('button',name='Close block library',exact=True).click()
+        self.page.get_by_role('button',name='Toggle block library',exact=True).click()
+        self.assertAlmostEqual(self.page.locator('#workbench-library').bounding_box()['width'],383,delta=1)
+        self.page.get_by_role('button',name='Toggle inspector',exact=True).click()
+        self.resize_panel('Resize inspector',-30,0)
+        expect(self.page.locator('#workbench-library')).to_be_hidden()
+        self.assertAlmostEqual(self.page.locator('#workbench-inspector').bounding_box()['width'],336,delta=1)
+        self.page.get_by_role('button',name='Collapse generated artifacts',exact=True).click()
+        self.page.get_by_role('button',name='Expand generated artifacts',exact=True).click()
+        self.assert_layout_bounds()
+        self.page.screenshot(path=str(OUT/'compact-resized.png'))
+
+
 if __name__=='__main__':
     unittest.main(verbosity=2)

@@ -66,6 +66,20 @@ The following tools are needed only when running the application directly:
 - Python 3.10 or newer
 - Node.js 20 or newer and npm
 
+### Start the complete app with one command
+
+```bash
+./start.sh
+```
+
+The script creates `.venv` if needed, installs Python dependencies, installs
+frontend dependencies when needed, builds the React UI, and starts the Python
+server. Open <http://127.0.0.1:8000>. Press Ctrl+C to stop. The first start needs
+internet access; use `./start.sh --help` for prerequisites. If a server already
+uses port 8000, stop it before running the script.
+
+For frontend development with live reloading, use the two-server setup below.
+
 ### Start the development servers
 
 From the repository root, create and activate a virtual environment, then install the Python dependencies:

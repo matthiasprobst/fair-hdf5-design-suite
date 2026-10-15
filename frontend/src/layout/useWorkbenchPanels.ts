@@ -2,13 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Keep aligned with the workbench breakpoint in workbench.css.
 const COMPACT_QUERY = '(width < 1150px)';
-type Panel = 'library' | 'inspector';
+type SidePanel = 'library' | 'inspector';
+type Panel = SidePanel | 'artifacts';
 
 /** UI preferences never enter the blueprint or trigger persistence/preview requests. */
 export function useWorkbenchPanels() {
   const [compact, setCompact] = useState(() => window.matchMedia(COMPACT_QUERY).matches);
+  const [desktopLibraryOpen, setDesktopLibraryOpen] = useState(true);
+  const [artifactsOpen, setArtifactsOpen] = useState(true);
   const [desktopInspectorOpen, setDesktopInspectorOpen] = useState(true);
-  const [overlay, setOverlay] = useState<Panel | null>(null);
+  const [overlay, setOverlay] = useState<SidePanel | null>(null);
+  const artifactsTrigger = useRef<HTMLButtonElement>(null);
   const libraryTrigger = useRef<HTMLButtonElement>(null);
   const inspectorTrigger = useRef<HTMLButtonElement>(null);
 
@@ -37,9 +41,16 @@ export function useWorkbenchPanels() {
 
   const close = useCallback(
     (panel: Panel) => {
-      if (compact) setOverlay(null);
+      if (panel === 'artifacts') setArtifactsOpen(false);
+      else if (compact) setOverlay(null);
       else if (panel === 'inspector') setDesktopInspectorOpen(false);
-      const trigger = panel === 'library' ? libraryTrigger : inspectorTrigger;
+      else setDesktopLibraryOpen(false);
+      const trigger =
+        panel === 'artifacts'
+          ? artifactsTrigger
+          : panel === 'library'
+            ? libraryTrigger
+            : inspectorTrigger;
       // The desktop reopen button becomes visible after React commits the closed state.
       requestAnimationFrame(() => trigger.current?.focus());
     },
@@ -48,13 +59,19 @@ export function useWorkbenchPanels() {
 
   return {
     compact,
-    libraryOpen: !compact || overlay === 'library',
+    libraryOpen: compact ? overlay === 'library' : desktopLibraryOpen,
+    artifactsOpen,
+    artifactsTrigger,
     inspectorOpen: compact ? overlay === 'inspector' : desktopInspectorOpen,
     libraryTrigger,
     inspectorTrigger,
     showInspector,
     close,
-    toggleLibrary: () => setOverlay((current) => (current === 'library' ? null : 'library')),
+    toggleLibrary: () => {
+      if (compact) setOverlay((current) => (current === 'library' ? null : 'library'));
+      else setDesktopLibraryOpen((current) => !current);
+    },
+    toggleArtifacts: () => setArtifactsOpen((current) => !current),
     toggleInspector: () => {
       if (compact) setOverlay((current) => (current === 'inspector' ? null : 'inspector'));
       else setDesktopInspectorOpen((current) => !current);

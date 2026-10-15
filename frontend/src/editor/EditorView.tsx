@@ -83,8 +83,9 @@ export function EditorView() {
           <EditorWorkspace
             onNotice={commands.onNotice}
             previewStructure={commands.previewStructure}
-            artifacts={
+            artifacts={(onClose) => (
               <Artifacts
+                onClose={onClose}
                 previewStatus={artifactState.preview.status}
                 validationStatus={artifactState.validation.status}
                 preview={preview}
@@ -98,7 +99,7 @@ export function EditorView() {
                 onValidation={() => commands.runValidation()}
                 onReport={() => commands.setDialog('validation')}
               />
-            }
+            )}
           />
         </ReactFlowProvider>
         <div className="statusbar">

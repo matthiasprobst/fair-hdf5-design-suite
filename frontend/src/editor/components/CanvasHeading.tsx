@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  PanelBottom,
   GitBranch,
   LayoutGrid,
   Maximize2,
@@ -34,7 +35,7 @@ export function CanvasHeading({ panels, showMinimap, toggleMinimap, previewStruc
       <div className="canvas-tools">
         <button
           ref={panels.libraryTrigger}
-          hidden={!panels.compact}
+          title="Show or hide block library"
           aria-label="Toggle block library"
           aria-expanded={panels.libraryOpen}
           aria-controls="workbench-library"
@@ -80,13 +81,23 @@ export function CanvasHeading({ panels, showMinimap, toggleMinimap, previewStruc
         </button>
         <button
           ref={panels.inspectorTrigger}
-          hidden={!panels.compact && panels.inspectorOpen}
+          title="Show or hide inspector"
           aria-label="Toggle inspector"
           aria-expanded={panels.inspectorOpen}
           aria-controls="workbench-inspector"
           onClick={panels.toggleInspector}
         >
           <SlidersHorizontal size={16} />
+        </button>
+        <button
+          ref={panels.artifactsTrigger}
+          title="Show or hide generated artifacts"
+          aria-label="Toggle generated artifacts"
+          aria-expanded={panels.artifactsOpen}
+          aria-controls="workbench-artifacts"
+          onClick={panels.toggleArtifacts}
+        >
+          <PanelBottom size={16} />
         </button>
       </div>
     </div>

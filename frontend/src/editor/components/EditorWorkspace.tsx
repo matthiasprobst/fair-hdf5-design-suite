@@ -12,7 +12,7 @@ import { editorStore, useEditor } from '../store';
 import { CanvasHeading } from './CanvasHeading';
 
 type Props = {
-  artifacts: ReactNode;
+  artifacts: (onClose: () => void) => ReactNode;
   onNotice: (text: string, error?: boolean) => void;
   previewStructure: () => void;
 };
@@ -65,14 +65,10 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
     <WorkbenchLayout
       panels={panels}
       library={
-        <Palette
-          catalog={catalog}
-          onAdd={addFromLibrary}
-          onClose={panels.compact ? () => panels.close('library') : undefined}
-        />
+        <Palette catalog={catalog} onAdd={addFromLibrary} onClose={() => panels.close('library')} />
       }
       inspector={<EditorInspector onClose={() => panels.close('inspector')} onNotice={onNotice} />}
-      artifacts={artifacts}
+      artifacts={artifacts(() => panels.close('artifacts'))}
       canvas={
         <section className="canvas-shell" aria-label="Design canvas">
           <CanvasHeading

@@ -116,3 +116,27 @@ test('pagehide preserves an interrupted drag without scheduling autosave',async(
  s.getState().onNodesChange([{id:'a',type:'position',position:{x:99.125,y:21.25},dragging:true}]);await wait(15);assert.equal(storage.writes,0);
  p.flush(true);assert.equal(JSON.parse(storage.getItem(STORAGE_KEY)!).nodes[0].x,99.125);p.stop();
 });
+
+// Panel sizing must reserve usable canvas space, independent of blueprint state.
+import { resolvePanelSizes, PANEL_MIN, CANVAS_MIN_WIDTH, PANEL_GAP } from '../src/layout/panelSizes';
+
+test('oversized side panels shrink to preserve the canvas at a desktop breakpoint', () => {
+ const desired={library:480,inspector:560,artifacts:213};
+ const sizes=resolvePanelSizes(desired,1134,600,false,true,true);
+ assert.ok(sizes.library>=PANEL_MIN.library && sizes.inspector>=PANEL_MIN.inspector);
+ assert.ok(1134-sizes.library-sizes.inspector-2*PANEL_GAP>=CANVAS_MIN_WIDTH-.001);
+ assert.deepEqual(desired,{library:480,inspector:560,artifacts:213});
+});
+test('collapsed side panels do not consume the open panel budget', () => {
+ const desired={library:480,inspector:560,artifacts:213};
+ const sizes=resolvePanelSizes(desired,1134,600,false,false,true);
+ assert.equal(sizes.inspector,560);
+ assert.equal(sizes.library,480);
+});
+test('compact overlays and artifacts respect available space and minimum dimensions', () => {
+ const sizes=resolvePanelSizes({library:999,inspector:999,artifacts:999},600,400,true,true,false);
+ assert.equal(sizes.library,480);
+ assert.equal(sizes.inspector,480);
+ assert.equal(sizes.artifacts,154);
+ assert.deepEqual(resolvePanelSizes({library:0,inspector:-5,artifacts:0},1000,600,false,true,true), PANEL_MIN);
+});

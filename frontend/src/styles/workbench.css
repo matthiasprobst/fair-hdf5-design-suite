@@ -7,54 +7,129 @@
   background: #f9fbff;
 }
 
-/* One owner for both split axes. These preferred sizes are future resize inputs. */
+/* Responsive initial preferences. Actual sizes and bounds live in panelSizes.ts. */
 .editor-view .workbench-layout {
   --library-width: 225px;
   --inspector-width: 333px;
   --artifacts-height: 213px;
   --panel-gap: 6px;
-  --canvas-min-height: 240px;
   flex: 1;
   min-width: 0;
-  min-height: calc(var(--canvas-min-height) + 160px + var(--panel-gap));
+  min-height: 366px;
   display: grid;
-  grid-template-rows: minmax(var(--canvas-min-height), 1fr) clamp(
-      160px,
-      var(--artifacts-height),
-      32%
-    );
   gap: var(--panel-gap);
   padding: 0 8px;
 }
-
+.editor-view .workbench-layout[data-artifacts-open='false'] {
+  min-height: 276px;
+}
 .editor-view .main-stage {
   position: relative;
   display: grid;
-  grid-template-columns: var(--library-width) minmax(0, 1fr) var(--inspector-width);
   gap: var(--panel-gap);
   min-width: 0;
   min-height: 0;
 }
-
-.editor-view .main-stage[data-inspector-open='false'] {
-  grid-template-columns: var(--library-width) minmax(0, 1fr);
-}
-
 .editor-view .workbench-library,
 .editor-view .workbench-inspector,
 .editor-view .workbench-artifacts {
+  position: relative;
   min-width: 0;
   min-height: 0;
 }
-
 .editor-view .workbench-library > .panel-shell,
 .editor-view .workbench-inspector > .panel-shell {
   height: 100%;
 }
-
-.editor-view .workbench-library[hidden],
-.editor-view .workbench-inspector[hidden] {
+.editor-view .workbench-artifacts,
+.editor-view .artifacts-collapsed {
+  grid-row: 2;
+}
+.editor-view .workbench-layout [hidden] {
   display: none;
+}
+.editor-view .artifacts-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #dce4ee;
+  border-radius: 7px;
+  background: white;
+  color: #34465f;
+  font-size: 11px;
+  font-weight: 600;
+}
+.editor-view .artifacts-collapsed svg:last-child {
+  margin-left: auto;
+}
+.editor-view .resize-handle {
+  position: absolute;
+  z-index: 12;
+  touch-action: none;
+  user-select: none;
+  outline-offset: -1px;
+  border-radius: 3px;
+}
+.editor-view .resize-handle::after {
+  content: '';
+  position: absolute;
+  border-radius: 3px;
+  background: #b6c6dc;
+  opacity: 0.5;
+}
+.editor-view .resize-handle:hover,
+.editor-view .resize-handle:focus-visible,
+.editor-view .resize-handle[data-resizing='true'] {
+  background: #c4daf8;
+  outline: 1px solid #80a9e3;
+}
+.editor-view .resize-handle[aria-orientation='vertical'] {
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+}
+.editor-view .resize-handle[aria-orientation='vertical']::after {
+  top: calc(50% - 18px);
+  bottom: calc(50% - 18px);
+  left: 2px;
+  width: 2px;
+}
+.editor-view .workbench-library > .resize-handle {
+  right: -6px;
+}
+.editor-view .workbench-inspector > .resize-handle {
+  left: -6px;
+}
+.editor-view .workbench-artifacts > .resize-handle {
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 6px;
+  cursor: row-resize;
+}
+.editor-view .resize-handle[aria-orientation='horizontal']::after {
+  left: calc(50% - 18px);
+  right: calc(50% - 18px);
+  top: 2px;
+  height: 2px;
+}
+.editor-view .workbench-layout:has(.resize-handle[data-resizing='true']) {
+  user-select: none;
+}
+.editor-view .canvas-heading {
+  height: auto;
+  min-height: 56px;
+  flex-wrap: wrap;
+  padding-block: 8px;
+}
+.editor-view .artifacts-heading-actions {
+  flex: none;
+}
+.editor-view .canvas-tools button[aria-expanded='true'] {
+  background: #eaf2ff;
+  color: #276ddd;
 }
 
 @media (max-width: 1450px) {
@@ -63,30 +138,24 @@
     --inspector-width: 306px;
   }
 }
-
 @media (max-height: 850px) {
   .editor-view .workbench-layout {
     --artifacts-height: 189px;
   }
 }
-
 @media (width < 1150px) {
-  .editor-view .main-stage,
-  .editor-view .main-stage[data-inspector-open='false'] {
-    grid-template-columns: minmax(0, 1fr);
+  .editor-view .workbench-layout {
+    --library-width: 333px;
   }
-
   .editor-view .workbench-library,
   .editor-view .workbench-inspector {
     position: absolute;
     top: 56px;
     bottom: 0;
-    width: min(333px, 80%);
     z-index: 10;
     box-shadow: 0 8px 25px #17314f30;
     border-radius: 8px;
   }
-
   .editor-view .workbench-library {
     left: 0;
   }
