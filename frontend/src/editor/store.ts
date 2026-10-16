@@ -1,3 +1,4 @@
+import type { Capabilities } from './limits';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { addEdge, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
@@ -9,6 +10,8 @@ import type { Graph, ScientificFlowEdge, ScientificFlowNode } from './adapters';
 
 export interface EditorState extends Graph {
   catalog: Catalog;
+  capabilities: Capabilities | null;
+  setCapabilities: (capabilities: Capabilities) => void;
   initialized: boolean;
   semanticRevision: number;
   saveRevision: number;
@@ -36,7 +39,8 @@ function remove(s: Pick<Graph, 'nodes'|'edges'>, nodeIds: string[], edgeIds: str
 }
 export function createEditorStore() {
   return createStore<EditorState>((set, get) => ({
-    name:'', version:'0.1', nodes:[], edges:[], catalog:{}, initialized:false, semanticRevision:0, saveRevision:0, graphRevision:0,
+    name:'', version:'0.1', nodes:[], edges:[], catalog:{}, capabilities:null, initialized:false, semanticRevision:0, saveRevision:0, graphRevision:0,
+    setCapabilities: capabilities => set({capabilities}),
     replace: (blueprint, catalog) => set(s=>({...fromBlueprint(blueprint), catalog:catalog??s.catalog, initialized:true, graphRevision:s.graphRevision+1, ...changed(s)})),
     rename: name => set(s=>name===s.name?s:{name,...changed(s)}),
     onNodesChange: changes => set(s=>{
@@ -65,14 +69,14 @@ export function createEditorStore() {
       edges:s.edges.some(e=>!!e.selected!==(edge&&e.id===id)) ? s.edges.map(e=>!!e.selected===(edge&&e.id===id)?e:{...e,selected:edge&&e.id===id}) : s.edges,
     })),
     addNode: (type,x,y) => set(s=>{
-      const info=s.catalog[type]; if(!info || s.nodes.length>=250 || !Number.isFinite(x)||!Number.isFinite(y))return s;
+      const info=s.catalog[type]; if(!info || (!s.capabilities || s.nodes.length>=s.capabilities.max_nodes) || !Number.isFinite(x)||!Number.isFinite(y))return s;
       const config={...info.defaults};
       if(info.kind&&config.path)config.path=uniquePath(String(config.path),toBlueprint(s));
       const node=fromNode({id:makeId(type,new Set(s.nodes.map(n=>n.id))),type,label:info.label,x,y,config});
       return {nodes:[...s.nodes.map(n=>n.selected?{...n,selected:false}:n),{...node,selected:true}],edges:s.edges.map(e=>e.selected?{...e,selected:false}:e),...changed(s)};
     }),
     duplicateNode: id => set(s=>{
-      const original=s.nodes.find(n=>n.id===id);if(!original||s.nodes.length>=250)return s;
+      const original=s.nodes.find(n=>n.id===id);if(!original||(!s.capabilities || s.nodes.length>=s.capabilities.max_nodes))return s;
       const n=toNode(original);n.id=makeId(n.type,new Set(s.nodes.map(n=>n.id)));n.label+=' (copy)';n.x+=40;n.y+=85;
       if(n.config.path)n.config.path=uniquePath(String(n.config.path),toBlueprint(s));
       return {nodes:[...s.nodes.map(n=>n.selected?{...n,selected:false}:n),{...fromNode(n),selected:true}],edges:s.edges.map(e=>e.selected?{...e,selected:false}:e),...changed(s)};
@@ -90,7 +94,7 @@ export function createEditorStore() {
       return {edges:s.edges.map(e=>e===edge?{...e,...fromEdge({...toEdge(e),relation}),selected:e.selected}:e),...changed(s)};
     }),
     isValidConnection: c => {
-      const s=get();return c.source!==c.target && c.sourceHandle==='out' && c.targetHandle==='in' && s.edges.length<1000 && s.nodes.some(n=>n.id===c.source) && s.nodes.some(n=>n.id===c.target) && !s.edges.some(e=>e.source===c.source&&e.target===c.target);
+      const s=get();return c.source!==c.target && c.sourceHandle==='out' && c.targetHandle==='in' && !!s.capabilities && s.edges.length<s.capabilities.max_edges && s.nodes.some(n=>n.id===c.source) && s.nodes.some(n=>n.id===c.target) && !s.edges.some(e=>e.source===c.source&&e.target===c.target);
     },
     connect: c => {
       if(!get().isValidConnection(c))return;

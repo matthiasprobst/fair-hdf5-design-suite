@@ -1,3 +1,4 @@
+import { graphLimitError } from './limits';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useStore } from 'zustand';
 import { CircleCheck, Code2, LoaderCircle } from 'lucide-react';
@@ -14,6 +15,7 @@ import '../styles/editor.css';
 
 export function EditorView() {
   const initialized = useEditor((state) => state.initialized);
+  const limitError = useEditor((state) => state.initialized ? graphLimitError(state, state.capabilities) : '');
   const name = useEditor((state) => state.name);
   const { apiError, storageError, savedAt, recoveryRaw } = useEditorLifecycle();
   const commands = useEditorCommands(recoveryRaw);
@@ -24,7 +26,8 @@ export function EditorView() {
   const shacl = artifactState.shacl.status === 'current' ? artifactState.shacl.data || '' : '';
   const requestErrors = Object.values(artifactState)
     .filter((item) => item.status === 'failed')
-    .map((item) => item.error);
+    .map((item) => item.error)
+    .filter((error) => error !== limitError);
 
   if (apiError)
     return (
@@ -64,8 +67,9 @@ export function EditorView() {
           hasRecovery={recoveryRaw !== null}
           commands={commands}
         />
-        {(storageError || requestErrors.length > 0) && (
+        {(storageError || limitError || requestErrors.length > 0) && (
           <div className="editor-error" role="alert">
+            {limitError && <span>{limitError}</span>}
             {storageError && (
               <span>
                 {storageError}{' '}

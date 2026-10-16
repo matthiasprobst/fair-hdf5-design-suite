@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fair-hdf5-design-suite"
+version = "0.1.0b1"
+description = "Backend for the FAIR HDF5 Design Suite research prototype"
+readme = "README.md"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fair_hdf5*"]
+namespaces = false
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

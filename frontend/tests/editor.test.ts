@@ -1,3 +1,4 @@
+import { demoWithinLimits, graphLimitError, parseCapabilities } from '../src/editor/limits';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -12,7 +13,8 @@ const blueprint:Blueprint={name:'Experiment',version:'0.1',nodes:[{id:'a',type:'
 const connection={source:'a',target:'b',sourceHandle:'out',targetHandle:'in'};
 const report:ValidationResult={conforms:true,checks:4,issue_count:0,issues:[],shacl_engine:'test',note:''};
 const preview:Preview={objects:[],profiles:2,node_count:2,edge_count:0};
-function editor(){const store=createEditorStore();store.getState().replace(blueprint,catalog);return store;}
+const capabilities={max_nodes:250,max_edges:1000,max_upload_bytes:30_000_000,shacl_engine:'pyshacl' as const};
+function editor(){const store=createEditorStore();store.getState().setCapabilities(capabilities);store.getState().replace(blueprint,catalog);return store;}
 function memory(raw:string|null=null){const values=new Map<string,string>();if(raw!==null)values.set(STORAGE_KEY,raw);let writes=0;return {values,get writes(){return writes;},getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>{writes++;values.set(key,value);}};}
 function deferred<T>(){let resolve!:(v:T)=>void;let reject!:(e:Error)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
 
@@ -107,7 +109,7 @@ test('250-node limit, duplicate paths and intentional replacement',()=>{
  for(let i=3;i<250;i++)s.getState().addNode('fan',i+.25,i+.75);
  assert.equal(s.getState().nodes.length,250);const before=s.getState();s.getState().addNode('fan',0,0);assert.equal(s.getState(),before);
  assert.equal(parseBlueprint(toBlueprint(s.getState()),catalog).nodes.length,250);
- assert.throws(()=>parseBlueprint({...toBlueprint(s.getState()),nodes:[...toBlueprint(s.getState()).nodes,blueprint.nodes[0]]},catalog),/250/);
+ assert.throws(()=>parseBlueprint({...toBlueprint(s.getState()),nodes:[...toBlueprint(s.getState()).nodes,blueprint.nodes[0]]},catalog,capabilities),/250/);
  const rev=s.getState().graphRevision;s.getState().replace(blueprint);assert.equal(s.getState().graphRevision,rev+1);assert.equal(s.getState().nodes.length,2);
 });
 
@@ -139,4 +141,45 @@ test('compact overlays and artifacts respect available space and minimum dimensi
  assert.equal(sizes.inspector,480);
  assert.equal(sizes.artifacts,154);
  assert.deepEqual(resolvePanelSizes({library:0,inspector:-5,artifacts:0},1000,600,false,true,true), PANEL_MIN);
+});
+
+test('capabilities must be valid before editing is enabled',()=>{
+ for(const value of [null,{}, {...capabilities,max_nodes:0},{...capabilities,max_edges:1.5},{...capabilities,max_upload_bytes:-1},{...capabilities,shacl_engine:'auto'}])assert.throws(()=>parseCapabilities(value));
+ assert.deepEqual(parseCapabilities(capabilities),capabilities);
+ const s=createEditorStore();s.getState().replace(blueprint,catalog);
+ const before=s.getState();s.getState().addNode('fan',0,0);s.getState().duplicateNode('a');s.getState().connect(connection);
+ assert.equal(s.getState(),before);
+});
+test('server limits above and below defaults govern add, duplicate, connections and imports',()=>{
+ const s=editor();s.getState().setCapabilities({...capabilities,max_nodes:260,max_edges:1});
+ for(let i=2;i<259;i++)s.getState().addNode('fan',i,i);
+ s.getState().duplicateNode('a');assert.equal(s.getState().nodes.length,260);
+ s.getState().duplicateNode('a');assert.equal(s.getState().nodes.length,260);
+ assert.equal(parseBlueprint(toBlueprint(s.getState()),catalog,s.getState().capabilities!).nodes.length,260);
+ s.getState().connect(connection);assert.equal(s.getState().edges.length,1);
+ assert.equal(s.getState().isValidConnection({...connection,target:s.getState().nodes[2].id}),false);
+ s.getState().setCapabilities({...capabilities,max_nodes:1});
+ const before=s.getState();s.getState().addNode('fan',0,0);s.getState().duplicateNode('a');assert.equal(s.getState(),before);
+ assert.throws(()=>parseBlueprint(blueprint,catalog,s.getState().capabilities!),/1 blocks/);
+ assert.equal(s.getState(),before);
+});
+test('lowered limits preserve drafts and JSON exports while blocking server processing',async()=>{
+ const storage=memory(JSON.stringify(blueprint));const draft=readDraft(()=>storage,catalog);
+ assert.deepEqual(draft.blueprint,blueprint);assert.equal(storage.writes,0);
+ const s=editor();s.getState().setCapabilities({...capabilities,max_nodes:1});
+ assert.match(graphLimitError(s.getState(),s.getState().capabilities),/Editing and JSON export remain available/);
+ assert.deepEqual(toBlueprint(s.getState()),blueprint);
+ let calls=0;const a=createArtifacts(s,{...api,preview:async()=>{calls++;return preview;}});
+ await a.preview();assert.equal(calls,0);assert.equal(a.store.getState().preview.status,'failed');
+ s.getState().updateNode('a',{label:'Still editable'});s.getState().deleteElements(['b']);
+ assert.equal(graphLimitError(s.getState(),s.getState().capabilities),'');
+ await a.preview();assert.equal(calls,1);assert.equal(a.store.getState().preview.status,'current');
+});
+test('demo and upload actions respect configured limits',async()=>{
+ assert.equal(demoWithinLimits(blueprint,capabilities),blueprint);
+ assert.equal(demoWithinLimits(blueprint,{...capabilities,max_nodes:1}).nodes.length,0);
+ const s=editor();s.getState().setCapabilities({...capabilities,max_upload_bytes:1});
+ let calls=0;const a=createArtifacts(s,{...api,validateFile:async()=>{calls++;return report;}});
+ await a.validation({size:2} as File);assert.equal(calls,0);assert.match(a.store.getState().validation.error,/1 bytes/);
+ await a.validation({size:1} as File);assert.equal(calls,1);
 });

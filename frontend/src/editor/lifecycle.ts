@@ -1,3 +1,4 @@
+import { demoWithinLimits } from './limits';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { parseBlueprint } from './adapters';
@@ -22,7 +23,7 @@ export function useEditorLifecycle() {
       try {
         // Read before the API request so recovery remains available if startup fails.
         try {setRecoveryRaw(localStorage.getItem(STORAGE_KEY));}catch(e){setStorageError(`Local storage unavailable: ${String(e)}`);}
-        const {catalog}=await api.catalog(controller.signal);
+        const [{catalog}, capabilities]=await Promise.all([api.catalog(controller.signal), api.capabilities(controller.signal)]);
         if(controller.signal.aborted)return;
         const draft=readDraft(()=>localStorage,catalog);
         let blueprint=draft.blueprint;
@@ -33,8 +34,9 @@ export function useEditorLifecycle() {
           setStorageError(`Saved draft could not be loaded: ${draft.error}. Its original contents are preserved.`);
           blueprint={name:'Recovered workspace',version:'0.1',nodes:[],edges:[]};
         }
-        if(!blueprint)blueprint=parseBlueprint(await api.demo(controller.signal),catalog);
+        if(!blueprint)blueprint=demoWithinLimits(parseBlueprint(await api.demo(controller.signal),catalog),capabilities);
         if(controller.signal.aborted)return;
+        editorStore.getState().setCapabilities(capabilities);
         editorStore.getState().replace(blueprint,catalog);
         if(blueprint.nodes.some(n=>n.id==='pressure'))editorStore.getState().select('pressure');
         setApiError('');setSavedAt(draft.blueprint?'Restored draft':'Not saved yet');

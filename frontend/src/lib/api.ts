@@ -1,3 +1,4 @@
+import { parseCapabilities } from '../editor/limits';
 import type { Blueprint, Catalog, Preview, ValidationResult } from '../types';
 async function checked(res: Response): Promise<Response> {
   if (!res.ok) {
@@ -15,6 +16,7 @@ async function postBlob(url: string, design: Blueprint, signal?: AbortSignal): P
   return (await checked(await fetch(url, {signal, method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(design)}))).blob();
 }
 export const api = {
+  capabilities: async (signal?: AbortSignal) => parseCapabilities(await (await checked(await fetch('/api/capabilities', {signal}))).json()),
   catalog: async (signal?: AbortSignal): Promise<{catalog:Catalog;profile_source:string}> => (await checked(await fetch('/api/catalog', {signal}))).json(),
   demo: async (signal?: AbortSignal): Promise<Blueprint> => (await checked(await fetch('/api/demo', {signal}))).json(),
   preview: (design:Blueprint, signal?: AbortSignal) => postJson<Preview>('/api/preview',design,signal),

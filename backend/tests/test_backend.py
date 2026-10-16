@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import h5py
 from rdflib import Graph
-from backend import demo, hdf5_template, shacl_turtle, validate_hdf5, normalize
+from fair_hdf5.compat import demo, hdf5_template, shacl_turtle, validate_hdf5, normalize
 
 
 class BackendTests(unittest.TestCase):

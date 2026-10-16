@@ -3,7 +3,24 @@ services:
     build: .
     init: true
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${FAIR_HDF5_PORT:-8000}:${FAIR_HDF5_PORT:-8000}"
+    environment:
+      # Container must listen on all interfaces; publishing remains loopback-only.
+      FAIR_HDF5_HOST: 0.0.0.0
+      FAIR_HDF5_PORT: ${FAIR_HDF5_PORT:-8000}
+      FAIR_HDF5_LOG_LEVEL: ${FAIR_HDF5_LOG_LEVEL:-info}
+      FAIR_HDF5_SERVE_FRONTEND: ${FAIR_HDF5_SERVE_FRONTEND:-true}
+      FAIR_HDF5_FRONTEND_DIST: ${FAIR_HDF5_FRONTEND_DIST:-frontend/dist}
+      FAIR_HDF5_TEMP_DIR: ${FAIR_HDF5_TEMP_DIR:-/tmp}
+      FAIR_HDF5_SHACL_ENGINE: ${FAIR_HDF5_SHACL_ENGINE:-pyshacl}
+      FAIR_HDF5_MAX_UPLOAD_BYTES: ${FAIR_HDF5_MAX_UPLOAD_BYTES:-30000000}
+      FAIR_HDF5_MAX_NODES: ${FAIR_HDF5_MAX_NODES:-250}
+      FAIR_HDF5_MAX_EDGES: ${FAIR_HDF5_MAX_EDGES:-1000}
+      FAIR_HDF5_MAX_METADATA_LENGTH: ${FAIR_HDF5_MAX_METADATA_LENGTH:-3000}
+      FAIR_HDF5_MAX_DATASET_DIMENSIONS: ${FAIR_HDF5_MAX_DATASET_DIMENSIONS:-5}
+      FAIR_HDF5_MAX_DIMENSION_SIZE: ${FAIR_HDF5_MAX_DIMENSION_SIZE:-50000}
+      FAIR_HDF5_MAX_DATASET_ELEMENTS: ${FAIR_HDF5_MAX_DATASET_ELEMENTS:-2000000}
+      FAIR_HDF5_MAX_REPORT_ISSUES: ${FAIR_HDF5_MAX_REPORT_ISSUES:-250}
     healthcheck:
       test:
         - CMD
@@ -11,9 +28,11 @@ services:
         - -c
         - >-
           import json, sys, urllib.request;
-          response = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5);
+          from fair_hdf5.settings import Settings;
+          settings = Settings();
+          response = urllib.request.urlopen(f'http://127.0.0.1:{settings.port}/health', timeout=5);
           data = json.load(response);
-          sys.exit(0 if data.get('status') == 'ok' and data.get('react_built') is True else 1)
+          sys.exit(0 if data.get('status') == 'ok' and (not settings.serve_frontend or data.get('react_built') is True) else 1)
       interval: 30s
       timeout: 10s
       start_period: 20s

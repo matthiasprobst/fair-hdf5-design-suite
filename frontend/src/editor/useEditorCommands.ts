@@ -1,3 +1,4 @@
+import { demoWithinLimits } from './limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Dialog } from '../components/Modal';
@@ -94,7 +95,9 @@ export function useEditorCommands(recoveryRaw: string | null) {
     if (!file) return;
     e.target.value = '';
     await execute('import', async (signal) => {
-      const content = parseBlueprint(JSON.parse(await file.text()), editorStore.getState().catalog);
+      const {catalog, capabilities} = editorStore.getState();
+      if (!capabilities) throw new Error('Backend limits are not loaded. Retry connection.');
+      const content = parseBlueprint(JSON.parse(await file.text()), catalog, capabilities);
       if (signal.aborted) return;
       editorStore.getState().replace(content);
       onNotice('Blueprint imported.');
@@ -103,11 +106,13 @@ export function useEditorCommands(recoveryRaw: string | null) {
   const reset = () =>
     void execute('reset', async (signal) => {
       if (!window.confirm('Reset the current experiment to the demonstration blueprint?')) return;
-      const content = parseBlueprint(await api.demo(signal), editorStore.getState().catalog);
+      const {catalog, capabilities} = editorStore.getState();
+      if (!capabilities) throw new Error('Backend limits are not loaded. Retry connection.');
+      const content = demoWithinLimits(parseBlueprint(await api.demo(signal), catalog), capabilities);
       if (signal.aborted) return;
       editorStore.getState().replace(content);
       editorStore.getState().select('pressure');
-      onNotice('Demo experiment restored.');
+      onNotice(content.nodes.length ? 'Demo experiment restored.' : 'Empty workspace restored; the demo exceeds the configured limits.');
     });
   const onSaveJson = () =>
     jsonFile(toBlueprint(editorStore.getState()), 'experiment-blueprint.json');

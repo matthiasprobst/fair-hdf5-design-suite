@@ -1,0 +1,2 @@
+# Compatibility include: full SHACL is now part of the default runtime.
+-r requirements.txt

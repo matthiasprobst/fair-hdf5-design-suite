@@ -8,7 +8,9 @@ Usage: ./start.sh
 
 Creates .venv when needed, installs Python dependencies, installs frontend
 packages when needed, builds the UI and starts the full app at:
-  http://127.0.0.1:8000
+  http://127.0.0.1:8000 (default; configure FAIR_HDF5_HOST / FAIR_HDF5_PORT)
+
+Settings are read from the project .env and environment. See .env.example.
 
 Requires Python 3.10+, Node.js 20+ and npm. The first start needs internet access.
 Press Ctrl+C to stop the app. Run from any directory using the script's path.
@@ -36,25 +38,14 @@ if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
 
-# Fail before installation/build if the API port is already occupied.
-.venv/bin/python - <<'PY'
-import socket
-import sys
-with socket.socket() as probe:
-    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        probe.bind(('127.0.0.1', 8000))
-    except OSError as error:
-        sys.exit(f'Cannot start on 127.0.0.1:8000: {error}. Stop the existing server and retry.')
-PY
-
 printf 'Checking Python dependencies…\n'
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e ./backend
+.venv/bin/python -m fair_hdf5 --check
 if [[ ! -x frontend/node_modules/.bin/vite || ! -f frontend/node_modules/.package-lock.json || frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
   printf 'Installing frontend dependencies…\n'
   npm ci --prefix frontend
 fi
 printf 'Building frontend…\n'
 npm run build --prefix frontend
-printf '\nStarting FAIR HDF5 Design Suite at http://127.0.0.1:8000\nPress Ctrl+C to stop.\n\n'
-exec .venv/bin/python app.py
+printf '\nStarting FAIR HDF5 Design Suite. Press Ctrl+C to stop.\n\n'
+exec .venv/bin/python -m fair_hdf5

@@ -1,3 +1,5 @@
+import { graphLimitError } from './limits';
+import type { Capabilities } from './limits';
 import { MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import type { Blueprint, Catalog, Config, DesignEdge, DesignNode, NodeType } from '../types';
@@ -10,11 +12,14 @@ const relationColor: Record<string, string> = {instrumented_by:'#2777e9', acquir
 
 // Validate the storage/import envelope, not scientific constraints. Incomplete
 // paths and metadata must remain editable even when the backend rejects them.
-export function parseBlueprint(value: unknown, catalog: Catalog): Blueprint {
+export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabilities): Blueprint {
   const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
   const fail = (message: string): never => { throw new Error(`Invalid blueprint: ${message}`); };
   if (!object(value) || typeof value.name !== 'string' || typeof value.version !== 'string' || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) return fail('expected name, version, nodes and edges.');
-  if (value.nodes.length > 250 || value.edges.length > 1000) return fail('limit is 250 nodes and 1000 edges.');
+  if (limits) {
+    const error = graphLimitError({nodes:value.nodes, edges:value.edges}, limits);
+    if (error) return fail(error);
+  }
   const ids = new Set<string>();
   const nodes = value.nodes.map((n): DesignNode => {
     if (!object(n) || typeof n.id !== 'string' || !/^[A-Za-z0-9_-]{1,90}$/.test(n.id) || ids.has(n.id)) return fail('node IDs must be valid and unique.');

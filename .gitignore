@@ -6,3 +6,12 @@ node_modules/
 /frontend/dist/
 *.tsbuildinfo
 depr/
+
+.env
+.env.*
+!.env.example
+
+# Python package installation/build metadata
+*.egg-info/
+/backend/build/
+/backend/dist/

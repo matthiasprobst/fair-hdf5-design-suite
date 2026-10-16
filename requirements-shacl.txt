@@ -1,2 +1,2 @@
+# Compatibility entry point; full SHACL is part of the default backend install.
 -r requirements.txt
-pyshacl>=0.25,<1

@@ -1,3 +1,4 @@
+import { graphLimitError } from './limits';
 import { createStore } from 'zustand/vanilla';
 import { api } from '../lib/api';
 import type { Preview, ValidationResult } from '../types';
@@ -21,6 +22,9 @@ export function createArtifacts(editor: EditorStore, client=api, delay=330) {
     store.setState({[key]:{...store.getState()[key],status:'loading',error:'',revision}});
     const current=()=>!controller.signal.aborted && controllers.get(key)===controller && editor.getState().semanticRevision===revision;
     try {
+      const state=editor.getState();
+      const limitError=graphLimitError(state,state.capabilities);
+      if(limitError)throw new Error(limitError);
       const data=await request(controller.signal);
       if(!current())return;
       store.setState({[key]:{status:'current',data,error:'',revision}});
@@ -31,7 +35,11 @@ export function createArtifacts(editor: EditorStore, client=api, delay=330) {
     } finally {if(controllers.get(key)===controller)controllers.delete(key);}
   }
   const preview=()=>{clearTimeout(timer);const blueprint=toBlueprint(editor.getState());return run('preview',signal=>client.preview(blueprint,signal));};
-  const validation=(file?:File)=>{const blueprint=toBlueprint(editor.getState());return run('validation',signal=>file?client.validateFile(blueprint,file,signal):client.validateTemplate(blueprint,signal));};
+  const validation=(file?:File)=>{const blueprint=toBlueprint(editor.getState());return run('validation',async signal=>{
+    const limits=editor.getState().capabilities;
+    if(file && limits && file.size>limits.max_upload_bytes)throw new Error(`Validation upload limit is ${limits.max_upload_bytes} bytes.`);
+    return file?client.validateFile(blueprint,file,signal):client.validateTemplate(blueprint,signal);
+  });};
   const shacl=()=>{const blueprint=toBlueprint(editor.getState());return run('shacl',async signal=>(await client.shacl(blueprint,signal)).text());};
   const hdf5=()=>{const blueprint=toBlueprint(editor.getState());return run('hdf5',signal=>client.hdf5(blueprint,signal));};
   const start=()=>{

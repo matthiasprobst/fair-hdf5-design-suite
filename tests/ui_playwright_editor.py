@@ -12,13 +12,11 @@ import json
 import os
 import re
 from pathlib import Path
-import sys
 import unittest
 
 from playwright.sync_api import sync_playwright, expect
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend import CATALOG, demo
+from fair_hdf5.catalog import CATALOG, demo
 
 URL = os.environ.get('FAIR_UI_URL', 'http://127.0.0.1:5173')
 OUT = Path(os.environ.get('FAIR_SCREENSHOT_DIR', '/tmp/fair-editor-qa'))
@@ -630,6 +628,59 @@ class EditorBrowserTests(unittest.TestCase):
         self.page.get_by_role('button',name='Expand generated artifacts',exact=True).click()
         self.assert_layout_bounds()
         self.page.screenshot(path=str(OUT/'compact-resized.png'))
+
+
+    def test_lowered_limits_preserve_draft_and_allow_repair(self):
+        self.page.route('**/api/capabilities', lambda route: route.fulfill(json={
+            'max_nodes':2, 'max_edges':1, 'max_upload_bytes':1000, 'shacl_engine':'pyshacl'}))
+        self.load()
+        self.graph_visible(3)
+        expect(self.page.get_by_role('alert')).to_contain_text('2 blocks and 1 connections')
+        self.assertEqual(self.stored(), BASE)
+        self.assertEqual(self.preview_requests, [])
+        self.page.screenshot(path=str(OUT/'lowered-limits-preserved.png'))
+        self.page.get_by_role('button',name='Project',exact=True).click()
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role('button',name='Export blueprint JSON').click()
+        self.assertEqual(json.loads(Path(transfer.value.path()).read_text()), BASE)
+        self.page.locator('input[type=file][accept*=".json"]').set_input_files({
+            'name':'oversized.json', 'mimeType':'application/json', 'buffer':json.dumps(BASE).encode()})
+        expect(self.page.get_by_role('status')).to_contain_text('exceeds the server limit')
+        self.assertEqual(self.stored(), BASE)
+        self.node('daq').locator('.node-title').click()
+        self.page.keyboard.press('Delete')
+        self.graph_visible(2)
+        self.wait_saved()
+        expect(self.page.locator('.artifact-shacl .artifact-status')).to_contain_text('Ready')
+        expect(self.page.get_by_role('alert')).to_have_count(0)
+        self.assertEqual(len(self.stored()['nodes']), 2)
+        self.page.reload()
+        self.graph_visible(2)
+
+    def test_failed_capabilities_preserve_saved_draft_until_retry(self):
+        self.expected_http_statuses.add(503)
+        self.page.route('**/api/capabilities', lambda route: route.fulfill(status=503, json={'detail':'Capabilities temporarily unavailable'}))
+        raw = json.dumps(BASE)
+        self.page.add_init_script(f"if(!sessionStorage.getItem('cap-seeded')){{localStorage.setItem({json.dumps(KEY)}, {json.dumps(raw)});sessionStorage.setItem('cap-seeded','yes')}}")
+        self.page.goto(URL)
+        expect(self.page.get_by_role('heading',name='Python backend unavailable')).to_be_visible()
+        self.assertEqual(self.page.evaluate('(key)=>localStorage.getItem(key)',KEY), raw)
+        self.page.unroute('**/api/capabilities')
+        self.page.get_by_role('button',name='Retry connection').click()
+        self.graph_visible(3)
+        self.assertEqual(self.stored(), BASE)
+
+    def test_demo_over_limit_starts_empty_and_remains_editable(self):
+        self.page.route('**/api/capabilities', lambda route: route.fulfill(json={
+            'max_nodes':1, 'max_edges':1, 'max_upload_bytes':1000, 'shacl_engine':'subset'}))
+        self.page.goto(URL)
+        self.graph_visible(0)
+        self.wait_saved()
+        self.assertEqual(self.stored()['nodes'], [])
+        expect(self.page.get_by_label('Experiment title')).to_have_value('Untitled experiment')
+        self.page.get_by_label('Experiment title').fill('Small experiment')
+        self.wait_saved()
+        self.assertEqual(self.stored()['name'], 'Small experiment')
 
 
 if __name__=='__main__':

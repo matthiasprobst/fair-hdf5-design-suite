@@ -1,4 +1,3 @@
--r requirements-shacl.txt
-# FastAPI TestClient and the existing browser smoke test.
-httpx==0.28.1
-playwright==1.63.0
+# Compatibility entry point; run pip from the repository root.
+-r requirements.txt
+-r backend/requirements-dev.txt

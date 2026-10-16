@@ -19,3 +19,8 @@ depr
 tests
 frontend/tests
 examples
+
+backend/tests
+backend/build
+backend/dist
+**/*.egg-info

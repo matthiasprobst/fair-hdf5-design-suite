@@ -1,0 +1,4 @@
+-r requirements-shacl.txt
+# FastAPI TestClient and the existing browser smoke test.
+httpx==0.28.1
+playwright==1.63.0
