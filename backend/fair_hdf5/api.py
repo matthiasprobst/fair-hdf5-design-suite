@@ -1,7 +1,7 @@
 """HTTP transport only. Synchronous handlers run processing in FastAPI's worker pool."""
 import json
 from typing import Annotated, Literal
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -28,13 +28,50 @@ class CapabilitiesOutput(BaseModel):
 
 
 @router.get("/catalog")
-def catalog():
-    return {"catalog": CATALOG, "profile_source": "Illustrative local profiles, not live NFDI4Ing MPS profiles"}
+def catalog(service: Service):
+    return {"catalog": service.repository.catalog(), "legacy_catalog": {key:service.repository.get(key, 1) for key in CATALOG}, "profile_source": "Persistent local SHACL library; MPS file import supported"}
+
+
+class ProfileImport(BaseModel):
+    ttl: str
+
+
+@router.post("/catalog/analyze")
+def analyze_profile(body: ProfileImport):
+    from .profile_schema import analyze_profile
+    return analyze_profile(body.ttl)
+
+
+@router.post("/catalog", status_code=201)
+def create_template(body: dict, service: Service):
+    if service.settings.shacl_engine != "pyshacl":
+        raise DesignError("Custom profiles require pyshacl.")
+    return service.repository.publish(body)
+
+
+class TemplateRevision(BaseModel):
+    expected_revision: int
+    template: dict
+
+
+@router.post("/catalog/{identifier}/revisions", status_code=201)
+def publish_revision(identifier: str, body: TemplateRevision, service: Service):
+    from .library import RevisionConflict
+    if service.settings.shacl_engine != "pyshacl": raise DesignError("Custom profiles require pyshacl.")
+    try:
+        return service.repository.publish(body.template, identifier, body.expected_revision)
+    except RevisionConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.get("/catalog/{identifier}/revisions/{revision}")
+def get_revision(identifier: str, revision: int, service: Service):
+    return service.repository.get(identifier, revision)
 
 
 @router.get("/demo")
-def get_demo():
-    return demo()
+def get_demo(service: Service):
+    return service.normalize(demo())
 
 
 @router.get("/capabilities", response_model=CapabilitiesOutput)

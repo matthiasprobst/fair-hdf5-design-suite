@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import math
 from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from .profiles import node_template
 from .catalog import CATALOG
 from .vocabulary import ALLOWED_DTYPES, ID_RE, KEY_RE
 from .settings import Settings
@@ -39,7 +40,7 @@ class ValidatedBlueprint:
     dataset_shapes: dict[str, tuple[int, ...]]
 
 
-def parse_blueprint(value: Any, settings: Settings) -> ValidatedBlueprint:
+def parse_blueprint(value: Any, settings: Settings, repository=None) -> ValidatedBlueprint:
     try:
         model = BlueprintInput.model_validate(value)
     except ValidationError as exc:
@@ -49,7 +50,18 @@ def parse_blueprint(value: Any, settings: Settings) -> ValidatedBlueprint:
     design.setdefault("name", model.name)
     design.setdefault("version", model.version)
     design.setdefault("edges", [])
+    from .library import validate_snapshot
     for node in design["nodes"]:
+        if node.get("template") is not None:
+            node["template"] = validate_snapshot(node["template"])
+            if node["template"]["id"] != node["type"]:
+                raise DesignError("Node type and template ID do not match.")
+        elif repository is not None:
+            node["template"] = repository.get(node["type"], 1 if node["type"] in CATALOG else None)
+        elif node["type"] in CATALOG:
+            node["template"] = validate_snapshot(CATALOG[node["type"]])
+        else:
+            raise DesignError("Unknown node type or missing template snapshot.")
         for coordinate in ("x", "y"):
             if coordinate in node and (node[coordinate] is None or not math.isfinite(node[coordinate])):
                 raise DesignError(f"Node {node['id']}: {coordinate} must be finite.")
@@ -67,7 +79,7 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
     ids = set()
     paths: dict[str, str] = {}
     for node in nodes:
-        if not isinstance(node, dict) or node.get("type") not in CATALOG:
+        if not isinstance(node, dict) or (not node.get("template") and node.get("type") not in CATALOG):
             raise DesignError("Unknown node type.")
         id = node.get("id", "")
         if not isinstance(id, str) or not ID_RE.fullmatch(id) or id in ids:
@@ -77,6 +89,8 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
             raise DesignError(f"Node {id}: configuration must be an object.")
         config = node.get("config", {})
         for k, v in config.items():
+            if k in {"design_node_id", "design_label", "design_type", "designed_shape"}:
+                raise DesignError(f"Node {id}: reserved HDF5 attribute: {k}")
             if not KEY_RE.fullmatch(str(k)) or not isinstance(v, (str, int, float, bool, type(None))):
                 raise DesignError(f"Node {id}: unsupported metadata key or value: {k}")
             if isinstance(v, float) and not math.isfinite(v):
@@ -87,7 +101,12 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
                 raise DesignError(f"Node {id}: metadata field {k} cannot contain NUL characters.")
             if isinstance(v, str) and len(v) > settings.max_metadata_length:
                 raise DesignError(f"Node {id}: metadata field {k} too long.")
-        kind = CATALOG[node["type"]]["kind"]
+        from .profile_schema import absolute_iri
+        for field in node_template(node).get("fields", []):
+            value = config.get(field["key"])
+            if field["datatype"] == "IRI" and value not in (None, "") and not absolute_iri(value):
+                raise DesignError(f"Node {id}: {field['key']} must be an absolute IRI.")
+        kind = node_template(node)["kind"]
         if kind:
             path = config.get("path", "")
             if not isinstance(path, str) or not path.startswith("/") or path == "/" or "//" in path or path.endswith("/") or "\x00" in path or len(path) > 512:
@@ -108,7 +127,7 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
             if config.get("dtype", "float64") not in ALLOWED_DTYPES:
                 raise DesignError(f"Node {id}: unsupported numeric dtype.")
             dataset_shapes[id] = parse_shape(str(config.get("shape", "0")), settings)
-    dataset_paths = {n["config"]["path"] for n in nodes if CATALOG[n["type"]]["kind"] == "dataset"}
+    dataset_paths = {n["config"]["path"] for n in nodes if node_template(n)["kind"] == "dataset"}
     for path in paths:
         parts = path.strip("/").split("/")
         for i in range(1, len(parts)):

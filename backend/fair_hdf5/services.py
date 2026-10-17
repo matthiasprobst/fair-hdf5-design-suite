@@ -5,7 +5,8 @@ from rdflib.namespace import SH
 
 from .domain import parse_blueprint, ValidatedBlueprint
 from .engines import create_engine, ValidationEngine
-from .errors import UploadTooLarge
+from .errors import UploadTooLarge, DesignError
+from .library import FileCatalogRepository, CatalogRepository
 from .hdf5 import hdf5_template, open_uploaded_hdf5, structural_checks
 from .preview import structure_preview
 from .semantic import build_shapes, rdf_from_hdf5
@@ -13,38 +14,51 @@ from .settings import Settings
 
 
 class DesignService:
-    def __init__(self, settings: Settings, engine: ValidationEngine | None = None):
+    def __init__(self, settings: Settings, engine: ValidationEngine | None = None, repository: CatalogRepository | None = None):
         self.settings = settings
+        self.repository = repository if repository is not None else FileCatalogRepository(settings.data_dir, settings)
         self.engine = engine if engine is not None else create_engine(settings.shacl_engine)
 
+    def _parse(self, value):
+        blueprint = parse_blueprint(value, self.settings, self.repository)
+        if self.settings.shacl_engine != "pyshacl":
+            for node in blueprint.data["nodes"]:
+                info = node["template"]
+                from .catalog import CATALOG
+                from rdflib.compare import isomorphic
+                from .profile_schema import parse_profile
+                if node["type"] not in CATALOG or info.get("revision") != 1 or info["mapping"] != CATALOG[node["type"]]["mapping"] or not isomorphic(parse_profile(info["profile_ttl"]), parse_profile(CATALOG[node["type"]]["profile_ttl"])):
+                    raise DesignError("Custom profiles require FAIR_HDF5_SHACL_ENGINE=pyshacl.")
+        return blueprint
+
     def normalize(self, value: Any) -> dict[str, Any]:
-        return parse_blueprint(value, self.settings).data
+        return self._parse(value).data
 
     def preview(self, value: Any):
-        return structure_preview(parse_blueprint(value, self.settings).data)
+        return structure_preview(self._parse(value).data)
 
     def shapes(self, value: Any):
-        return build_shapes(parse_blueprint(value, self.settings).data)
+        return build_shapes(self._parse(value).data)
 
     def shacl(self, value: Any) -> str:
         return self.shapes(value).serialize(format="turtle")
 
     def template(self, value: Any) -> bytes:
-        blueprint = parse_blueprint(value, self.settings)
+        blueprint = self._parse(value)
         return hdf5_template(blueprint.data, blueprint.dataset_shapes)
 
     def validate_template(self, value: Any):
-        blueprint = parse_blueprint(value, self.settings)
+        blueprint = self._parse(value)
         content = hdf5_template(blueprint.data, blueprint.dataset_shapes)
         return self._validate(blueprint, content)
 
     def validate(self, value: Any, content: bytes):
-        blueprint = parse_blueprint(value, self.settings)
+        blueprint = self._parse(value)
         self._check_upload_size(len(content))
         return self._validate(blueprint, content)
 
     def validate_upload(self, value: Any, file: BinaryIO):
-        blueprint = parse_blueprint(value, self.settings)
+        blueprint = self._parse(value)
         content = file.read(self.settings.max_upload_bytes + 1)
         self._check_upload_size(len(content))
         return self._validate(blueprint, content)

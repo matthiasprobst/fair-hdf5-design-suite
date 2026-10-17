@@ -24,6 +24,8 @@ COPY backend/ ./backend/
 RUN python -m pip install --no-cache-dir --no-deps -e ./backend
 COPY --from=frontend-build /build/frontend/dist/ ./frontend/dist/
 
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
+
 USER appuser
 EXPOSE 8000
 CMD ["python", "-m", "fair_hdf5"]

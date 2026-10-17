@@ -1,10 +1,19 @@
-export type NodeType = 'fan'|'pressure_sensor'|'temperature_sensor'|'torque_sensor'|'flow_sensor'|'daq'|'process'|'group'|'dataset'|'metadata'|'experiment_setup'|'boundary_condition'|'vibration_sensor'|'custom_sensor'|'controller'|'power_supply'|'data_processor'|'data_processing'|'filter_process'|'unit_conversion'|'custom_process';
+export type NodeType = string;
 export type Value = string | number | boolean | null;
 export type Config = Record<string, Value>;
-export interface DesignNode { id: string; type: NodeType; label: string; x: number; y: number; config: Config }
+export interface DesignNode { id: string; type: NodeType; label: string; x: number; y: number; config: Config; template?: CatalogItem }
 export interface DesignEdge { id: string; source: string; target: string; relation: string }
 export interface Blueprint { name: string; version: string; nodes: DesignNode[]; edges: DesignEdge[] }
+export interface ProfileField {
+  key: string; predicate: string; label: string; description?: string; datatype: string;
+  required: boolean; order?: number; choices?: string[]; defaultValue?: string; hasValue?: string;
+  minInclusive?: string; maxInclusive?: string; minExclusive?: string; maxExclusive?: string;
+  minLength?: string; maxLength?: string; pattern?: string; flags?: string;
+}
 export interface CatalogItem {
+  initial?: CatalogItem;
+  id?: string; revision?: number; shape?: string; profile_ttl?: string; profile_hash?: string;
+  mapping?: Record<string,string>; fields?: ProfileField[];
   label: string; category: string; icon: string; profile: string; kind: 'group'|'dataset'|null;
   color: string; required: string[]; defaults: Config;
 }

@@ -251,3 +251,81 @@ The project is released under the [Apache License 2.0](LICENSE). Third-party dep
 ## Contributing
 
 Bug reports and contributions are welcome through GitHub issues and pull requests.
+
+## Persistent SHACL library
+
+Use **Create / import template** in the building-block library to create a
+component with the form editor or import a Turtle (`.ttl`) SHACL file. Analyze
+an imported file, select a supported named NodeShape, review the fields and
+choose their HDF5 attribute names. Set a category, icon, color, object kind and
+default HDF5 path, then save. Use the pencil next to an entry to publish a new
+revision; its original Turtle remains editable without discarding annotations.
+
+The installation-wide library lives under `FAIR_HDF5_DATA_DIR` (default:
+`data/`, relative to the repository root):
+
+```text
+data/catalog/
+  profiles/<sha256>.ttl
+  templates/<stable-template-id>/<revision>.json
+```
+
+SHACL is the source of field rules. JSON stores the profile hash, selected
+shape, property-IRI-to-HDF5-attribute mapping, presentation and defaults. Profile
+files and revisions are immutable. The file repository uses POSIX file locks,
+atomic replacement and fsync; use a local filesystem supporting these semantics.
+Temporary `.pending-*` files and unreferenced profiles left after interrupted
+writes do not become catalog entries. Back up the entire directory; do not edit
+published files in place. Unreadable published files produce an error rather
+than silently resetting user data.
+
+The initial templates are packaged in `backend/fair_hdf5/seeds/` and copied only
+when their first revision does not exist. Docker Compose mounts the persistent
+`catalog-data` volume. Removing that volume removes the library. No accounts or
+per-user access controls are introduced: this is a shared local installation.
+
+A local example for file import is `examples/profiles/pressure-profile.ttl`.
+It exercises required text, decimal bounds, a date, an enum and a boolean; it is
+not an exported MPS profile.
+
+### Profiles and portable designs
+
+Every new node pins a complete template snapshot, including Turtle and its hash.
+Blueprint JSON and the blueprint embedded in HDF5 therefore remain portable
+without the originating library. Existing legacy nodes resolve to the bundled
+first revision, even after their template is updated. The inspector offers an
+explicit revision update with rule review and validation. Updating retains
+existing values and adds new defaults; validation may report fields requiring
+attention. Importing a design does not publish its snapshots into the library.
+
+Supported SHACL: named NodeShapes with direct property IRIs; `maxCount 1` and
+`minCount 0/1`; string, boolean, integer, decimal, double, date, dateTime and IRI
+values; `in`, `hasValue`, numeric bounds, string lengths and regex patterns
+(flags i/m/s/x); labels, descriptions, order, groups and defaults. Datatypes or
+IRI node kind must be explicit. Unsupported constraints, nested shapes,
+multivalued properties, complex paths and SPARQL are rejected with an explanation.
+Only Turtle is imported; parsing never retrieves remote contexts or imports.
+A file may contain multiple named shapes; select one for the template.
+
+Source targeting is replaced by explicit targeting of each corresponding
+canvas node during validation. Original Turtle remains intact in the snapshot.
+HDF5 attributes are projected using the selected property IRIs and declared RDF
+datatypes. Decimal and date lexical values can remain strings in HDF5 to avoid
+precision loss. Blank inputs represent absent attributes. The existing HDF5
+structure checks still run. Custom profiles require the pySHACL engine; the
+explicit legacy subset mode cannot validate custom profiles.
+
+### Catalog API
+
+- `GET /api/catalog`: current revisions and the original built-in revisions.
+- `POST /api/catalog/analyze`: `{ "ttl": "..." }`, returning named shapes,
+  supported fields, and explanations for unsupported shapes.
+- `POST /api/catalog`: publish a template. Supply label, category, icon, color,
+  kind, defaults, shape and either `profile_ttl` plus `mapping` or `fields`.
+- `POST /api/catalog/{id}/revisions`: `{ "expected_revision": 1,
+  "template": { ... } }`; stale revisions return HTTP 409.
+- `GET /api/catalog/{id}/revisions/{revision}`: retrieve an immutable snapshot.
+
+MPS discovery/synchronization, JSON-LD and nested profiles are not included.
+Compatibility with a specific MPS export must be checked against that file;
+no complete MPS compatibility is claimed.

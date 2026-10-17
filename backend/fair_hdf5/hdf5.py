@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from uuid import uuid4
 from typing import Any
 import h5py
-from .catalog import CATALOG
+from .profiles import node_template
 from .errors import DesignError
 from .profiles import profile_required as _profile_required, profile_iri as _profile_iri
 
@@ -16,14 +16,14 @@ def hdf5_template(design: dict[str, Any], dataset_shapes: dict[str, tuple[int, .
         f.attrs["design_schema_version"] = "0.1"
         f.attrs["validation_note"] = "Semantic SHACL validation applies to an RDF projection of this file."
         # First create all groups (explicit + implicit parent groups).
-        group_nodes = sorted((n for n in design["nodes"] if CATALOG[n["type"]]["kind"] == "group"), key=lambda n: n["config"]["path"].count("/"))
+        group_nodes = sorted((n for n in design["nodes"] if node_template(n)["kind"] == "group"), key=lambda n: n["config"]["path"].count("/"))
         for node in group_nodes:
             path = node["config"]["path"]
             if path in f and not isinstance(f[path], h5py.Group):
                 raise DesignError(f"Cannot create group at {path}: dataset already exists.")
             f.require_group(path)
         for node in design["nodes"]:
-            kind = CATALOG[node["type"]]["kind"]
+            kind = node_template(node)["kind"]
             if not kind:
                 continue
             cfg = node["config"]
@@ -72,7 +72,7 @@ def structural_checks(design, f, dataset_shapes):
     issues = []
     checks = 0
     for node in design["nodes"]:
-        info = CATALOG[node["type"]]
+        info = node_template(node)
         if not info["kind"]:
             continue
         cfg = node.get("config", {})
@@ -94,6 +94,12 @@ def structural_checks(design, f, dataset_shapes):
             expected_shape = dataset_shapes[node["id"]]
             if len(obj.shape) != len(expected_shape) or any((spec > 0 and actual != spec) for spec, actual in zip(expected_shape, obj.shape)):
                 issues.append({"path": path, "rule": "shape", "message": f"Expected dimensions {expected_shape} (0 means variable), found {obj.shape}."})
+        for field in info.get("fields", []):
+            key = field["key"]
+            if key in obj.attrs:
+                checks += 1
+                if getattr(obj.attrs[key], "shape", ()) != ():
+                    issues.append({"path": path, "rule": key, "message": f"Metadata '{key}' must be a scalar HDF5 attribute."})
         for field in _profile_required(node):
             checks += 1
             if field not in obj.attrs or not str(obj.attrs[field]).strip():

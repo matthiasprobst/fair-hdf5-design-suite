@@ -1,0 +1,40 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/fair-hdf5-designer/demo/profiles/temperature-sensor> a sh:NodeShape ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 0 ;
+            sh:name "quantity" ;
+            sh:order 3 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#quantity> ],
+        [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "serial_number" ;
+            sh:order 1 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number> ],
+        [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "calibration_date" ;
+            sh:order 2 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#calibration_date> ],
+        [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "manufacturer" ;
+            sh:order 0 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer> ],
+        [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 0 ;
+            sh:name "unit" ;
+            sh:order 4 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#unit> ] .
+

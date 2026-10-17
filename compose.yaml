@@ -6,6 +6,7 @@ services:
       - "127.0.0.1:${FAIR_HDF5_PORT:-8000}:${FAIR_HDF5_PORT:-8000}"
     environment:
       # Container must listen on all interfaces; publishing remains loopback-only.
+      FAIR_HDF5_DATA_DIR: /app/data
       FAIR_HDF5_HOST: 0.0.0.0
       FAIR_HDF5_PORT: ${FAIR_HDF5_PORT:-8000}
       FAIR_HDF5_LOG_LEVEL: ${FAIR_HDF5_LOG_LEVEL:-info}
@@ -21,6 +22,8 @@ services:
       FAIR_HDF5_MAX_DIMENSION_SIZE: ${FAIR_HDF5_MAX_DIMENSION_SIZE:-50000}
       FAIR_HDF5_MAX_DATASET_ELEMENTS: ${FAIR_HDF5_MAX_DATASET_ELEMENTS:-2000000}
       FAIR_HDF5_MAX_REPORT_ISSUES: ${FAIR_HDF5_MAX_REPORT_ISSUES:-250}
+    volumes:
+      - catalog-data:/app/data
     healthcheck:
       test:
         - CMD
@@ -37,3 +40,6 @@ services:
       timeout: 10s
       start_period: 20s
       retries: 3
+
+volumes:
+  catalog-data:

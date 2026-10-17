@@ -1,0 +1,41 @@
+# Local example for the supported import subset; this is not an MPS export.
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <https://example.org/pressure/> .
+
+ex:PressureSensor a sh:NodeShape ;
+    sh:name "Pressure sensor with calibration" ;
+    sh:property [
+        sh:path ex:serialNumber ;
+        sh:name "Serial number" ;
+        sh:description "Manufacturer serial number, for example P-001." ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^P-[0-9]+$" ;
+        sh:defaultValue "P-001" ; sh:order 1
+    ], [
+        sh:path ex:maximumPressure ;
+        sh:name "Maximum pressure (Pa)" ;
+        sh:datatype xsd:decimal ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:minExclusive 0 ; sh:maxInclusive 1000000 ;
+        sh:defaultValue 100000.0 ; sh:order 2
+    ], [
+        sh:path ex:calibrationDate ;
+        sh:name "Calibration date" ;
+        sh:datatype xsd:date ;
+        sh:minCount 0 ; sh:maxCount 1 ; sh:order 3
+    ], [
+        sh:path ex:status ;
+        sh:name "Status" ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:in ("ready" "maintenance") ;
+        sh:defaultValue "ready" ; sh:order 4
+    ], [
+        sh:path ex:calibrated ;
+        sh:name "Calibrated" ;
+        sh:datatype xsd:boolean ;
+        sh:minCount 0 ; sh:maxCount 1 ;
+        sh:defaultValue false ; sh:order 5
+    ] .

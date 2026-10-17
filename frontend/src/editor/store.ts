@@ -3,13 +3,15 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { addEdge, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
 import type { Connection, EdgeChange, NodeChange } from '@xyflow/react';
-import type { Blueprint, Catalog, Config, NodeType } from '../types';
+import type { Blueprint, Catalog, CatalogItem, Config, NodeType } from '../types';
 import { makeId, suggestedRelation, uniquePath } from '../lib/api';
 import { fromBlueprint, fromEdge, fromNode, toBlueprint, toEdge, toNode } from './adapters';
 import type { Graph, ScientificFlowEdge, ScientificFlowNode } from './adapters';
 
 export interface EditorState extends Graph {
   catalog: Catalog;
+  setCatalog: (catalog: Catalog) => void;
+  upgradeNode: (id: string, template: CatalogItem) => void;
   capabilities: Capabilities | null;
   setCapabilities: (capabilities: Capabilities) => void;
   initialized: boolean;
@@ -40,6 +42,8 @@ function remove(s: Pick<Graph, 'nodes'|'edges'>, nodeIds: string[], edgeIds: str
 export function createEditorStore() {
   return createStore<EditorState>((set, get) => ({
     name:'', version:'0.1', nodes:[], edges:[], catalog:{}, capabilities:null, initialized:false, semanticRevision:0, saveRevision:0, graphRevision:0,
+    setCatalog: catalog => set({catalog}),
+    upgradeNode: (id, template) => set(s=>({nodes:s.nodes.map(n=>n.id===id?{...n,data:{...n.data,template,config:{...template.defaults,...n.data.config}}}:n),...changed(s)})),
     setCapabilities: capabilities => set({capabilities}),
     replace: (blueprint, catalog) => set(s=>({...fromBlueprint(blueprint), catalog:catalog??s.catalog, initialized:true, graphRevision:s.graphRevision+1, ...changed(s)})),
     rename: name => set(s=>name===s.name?s:{name,...changed(s)}),
@@ -72,7 +76,7 @@ export function createEditorStore() {
       const info=s.catalog[type]; if(!info || (!s.capabilities || s.nodes.length>=s.capabilities.max_nodes) || !Number.isFinite(x)||!Number.isFinite(y))return s;
       const config={...info.defaults};
       if(info.kind&&config.path)config.path=uniquePath(String(config.path),toBlueprint(s));
-      const node=fromNode({id:makeId(type,new Set(s.nodes.map(n=>n.id))),type,label:info.label,x,y,config});
+      const node=fromNode({id:makeId(type,new Set(s.nodes.map(n=>n.id))),type,label:info.label,x,y,config,template:info});
       return {nodes:[...s.nodes.map(n=>n.selected?{...n,selected:false}:n),{...node,selected:true}],edges:s.edges.map(e=>e.selected?{...e,selected:false}:e),...changed(s)};
     }),
     duplicateNode: id => set(s=>{

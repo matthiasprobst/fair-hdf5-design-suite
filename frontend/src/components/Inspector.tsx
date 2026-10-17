@@ -1,3 +1,7 @@
+import ProfileFieldInput from './ProfileFieldInput';
+import { editorStore } from '../editor/store';
+import { toBlueprint } from '../editor/adapters';
+import { api } from '../lib/api';
 import { useState } from 'react';
 import {
   Box,
@@ -15,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Catalog, DesignEdge, DesignNode } from '../types';
-import { COLORS, ICONS } from '../lib/ui';
+import { nodeTone, ICONS } from '../lib/ui';
 import { relations, requiredFields } from '../lib/api';
 
 const keyRe = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -47,6 +51,8 @@ export default function Inspector({
   onClose,
   onNotice,
 }: Props) {
+  const [upgradePreview, setUpgradePreview] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [newKey, setNewKey] = useState('');
   const [required, setRequired] = useState(true);
   const [advanced, setAdvanced] = useState(false);
@@ -105,13 +111,14 @@ export default function Inspector({
         </div>
       </aside>
     );
-  const info = catalog[node.type];
-  const Icon = ICONS[node.type];
-  const tone = COLORS[node.type];
+  const info = node.template || catalog[node.type];
+  const latest = catalog[node.type];
+  const Icon = ICONS[info?.icon] || ICONS[node.type] || Box;
+  const tone = nodeTone(node.type,info?.color);
   const c = node.config;
-  const req = requiredFields(node.type, c, catalog);
-  const fields = Object.keys(c).filter(
-    (k) => !internal.includes(k) && !['quantity', 'unit'].includes(k),
+  const req = requiredFields(node.type, c, {[node.type]:info});
+  const fields = Array.from(new Set([...Object.keys(c), ...(info.fields||[]).map(f=>f.key)])).filter(
+    (k) => !internal.includes(k) && (!['quantity', 'unit'].includes(k) || !!info.fields?.some(f=>f.key===k)),
   );
   const customReq = String(c.required_fields || '')
     .split(',')
@@ -171,7 +178,7 @@ export default function Inspector({
           />
         </div>
         <div className="form-field">
-          <label>Attached profile (local demonstration)</label>
+          <label>Attached profile</label>
           <div className="profile-select-wrap">
             <span className="readonly-profile">{info?.profile || 'Not assigned'}</span>
             <button
@@ -183,7 +190,16 @@ export default function Inspector({
               <ExternalLink size={15} />
             </button>
           </div>
-          <small>Profile import is not yet connected to the MPS.</small>
+          <small>Revision {info.revision || 1} · Stored with this design</small>
+          {latest?.revision && latest.revision > (info.revision||1) && <button onClick={()=>setUpgradePreview(v=>!v)}>Review revision {latest.revision}</button>}
+          {upgradePreview && <div className="technical-note"><div>
+            <strong>Update to revision {latest.revision}</strong>
+            <p>New fields: {(latest.fields||[]).filter(f=>!info.fields?.some(old=>old.key===f.key)).map(f=>f.key).join(', ')||'None'}</p>
+            <p>Removed fields: {(info.fields||[]).filter(f=>!latest.fields?.some(next=>next.key===f.key)).map(f=>f.key).join(', ')||'None'}. Existing values are retained.</p>
+            <p>Required: {latest.required.join(', ')||'None'}. Rules and HDF5 mapping may change.</p>
+            <details><summary>Review new rules</summary><pre style={{whiteSpace:'pre-wrap'}}>{latest.profile_ttl}</pre></details>
+            <button disabled={upgrading} onClick={async()=>{setUpgrading(true);editorStore.getState().upgradeNode(node.id,latest);try{const result=await api.validateTemplate(toBlueprint(editorStore.getState()));onNotice(result.conforms?'Template updated; validation passed.':`Template updated: ${result.issue_count} validation issues.`,!result.conforms);}catch(e){onNotice(`Template updated; validation failed: ${e instanceof Error?e.message:String(e)}`,true);}finally{setUpgrading(false);setUpgradePreview(false);}}}>{upgrading?'Validating…':'Apply revision and validate'}</button>
+          </div></div>}
         </div>
         <div className="form-field">
           <label>Profile URI (optional override)</label>
@@ -207,7 +223,7 @@ export default function Inspector({
             <small>Explicit physical location, independent of graph connections.</small>
           </div>
         )}
-        {(node.type === 'dataset' || node.type.endsWith('_sensor')) && (
+        {!info.fields?.some(f=>['unit','quantity'].includes(f.key)) && (node.type === 'dataset' || node.type.endsWith('_sensor')) && (
           <>
             <div className="form-field">
               <label>Quantity (measured)</label>
@@ -226,7 +242,7 @@ export default function Inspector({
             </div>
           </>
         )}
-        {node.type === 'dataset' && (
+        {info.kind === 'dataset' && (
           <div className="dataset-settings">
             <div className="form-field">
               <label>Numeric data type</label>
@@ -287,13 +303,9 @@ export default function Inspector({
           </div>
           {fields.map((k) => (
             <div key={k} className="metadata-row">
-              <label title={k}>{k.replaceAll('_', ' ')}</label>
+              <label title={k}>{info.fields?.find(f=>f.key===k)?.label || k.replaceAll('_', ' ')}</label>
               <div className="metadata-input-row">
-                <input
-                  value={value(k)}
-                  onChange={(e) => update(k, e.target.value)}
-                  placeholder={req.includes(k) ? 'Required value' : 'Optional'}
-                />
+                {info.fields?.find(f=>f.key===k) ? <ProfileFieldInput field={info.fields.find(f=>f.key===k)!} value={value(k)} onChange={v=>onUpdate(node.id,{config:{[k]:v}})}/> : <input value={value(k)} onChange={e=>update(k,e.target.value)} placeholder={req.includes(k)?'Required value':'Optional'}/> }
                 {!info.required.includes(k) && (
                   <button aria-label={`Remove ${k}`} onClick={() => removeCustom(k)}>
                     <X size={13} />

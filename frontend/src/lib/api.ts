@@ -1,5 +1,5 @@
 import { parseCapabilities } from '../editor/limits';
-import type { Blueprint, Catalog, Preview, ValidationResult } from '../types';
+import type { Blueprint, Catalog, CatalogItem, ProfileField, Preview, ValidationResult } from '../types';
 async function checked(res: Response): Promise<Response> {
   if (!res.ok) {
     let message = `Request failed (HTTP ${res.status})`;
@@ -8,16 +8,23 @@ async function checked(res: Response): Promise<Response> {
   }
   return res;
 }
-async function postJson<T>(url: string, design: Blueprint, signal?: AbortSignal): Promise<T> {
+async function postJson<T>(url: string, design: unknown, signal?: AbortSignal): Promise<T> {
   const res = await checked(await fetch(url, {signal, method: 'POST', headers: {'Content-Type':'application/json'}, body:JSON.stringify(design)}));
   return res.json() as Promise<T>;
 }
 async function postBlob(url: string, design: Blueprint, signal?: AbortSignal): Promise<Blob> {
   return (await checked(await fetch(url, {signal, method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(design)}))).blob();
 }
+export interface ProfileAnalysis { shapes: {shape:string;label:string;supported:boolean;fields?:ProfileField[];error?:string}[] }
 export const api = {
+  analyzeProfile: (ttl:string) => postJson<ProfileAnalysis>('/api/catalog/analyze',{ttl}),
+  saveTemplate: (template:Partial<CatalogItem>, id?:string, revision?:number) => postJson<CatalogItem>(id?`/api/catalog/${encodeURIComponent(id)}/revisions`:'/api/catalog',id?{expected_revision:revision,template}:template),
   capabilities: async (signal?: AbortSignal) => parseCapabilities(await (await checked(await fetch('/api/capabilities', {signal}))).json()),
-  catalog: async (signal?: AbortSignal): Promise<{catalog:Catalog;profile_source:string}> => (await checked(await fetch('/api/catalog', {signal}))).json(),
+  catalog: async (signal?: AbortSignal): Promise<{catalog:Catalog;profile_source:string}> => {
+    const result = await (await checked(await fetch('/api/catalog', {signal}))).json() as {catalog:Catalog;legacy_catalog?:Catalog;profile_source:string};
+    for (const [id, item] of Object.entries(result.catalog)) if (item.revision !== 1 && result.legacy_catalog?.[id]) item.initial=result.legacy_catalog[id];
+    return result;
+  },
   demo: async (signal?: AbortSignal): Promise<Blueprint> => (await checked(await fetch('/api/demo', {signal}))).json(),
   preview: (design:Blueprint, signal?: AbortSignal) => postJson<Preview>('/api/preview',design,signal),
   shacl: (design:Blueprint, signal?: AbortSignal) => postBlob('/api/export/shacl',design,signal),

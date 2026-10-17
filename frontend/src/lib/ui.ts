@@ -22,3 +22,7 @@ export const COLORS:Record<string,string> = {
  fan:'purple',experiment_setup:'purple',boundary_condition:'purple',pressure_sensor:'blue',temperature_sensor:'blue',torque_sensor:'blue',flow_sensor:'blue',vibration_sensor:'blue',custom_sensor:'blue',
  daq:'green',controller:'green',power_supply:'green',data_processor:'green',process:'orange',data_processing:'orange',filter_process:'orange',unit_conversion:'orange',custom_process:'orange',group:'coral',dataset:'coral',metadata:'violet',
 };
+
+export function nodeTone(type: string, color?: string): string {
+  return color ? ({amber:'orange',rose:'coral'}[color] || color) : COLORS[type] || 'blue';
+}

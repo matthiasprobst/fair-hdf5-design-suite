@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Catalog, NodeType } from '../types';
+import LibraryEditor from './LibraryEditor';
 import { CATEGORY_ICONS, ICONS } from '../lib/ui';
 
 const order = ['Experiment', 'Sensor', 'Equipment', 'Process', 'HDF5 structure', 'Metadata'];
@@ -27,11 +28,12 @@ interface Props {
   onClose?: () => void;
 }
 export default function Palette({ catalog, onAdd, onClose }: Props) {
+  const [editing, setEditing] = useState<string|null|undefined>(undefined);
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const groups = useMemo(
     () =>
-      order
+      [...order, ...Array.from(new Set(Object.values(catalog).map(i=>i.category))).filter(c=>!order.includes(c))]
         .map((category) => ({
           category,
           items: Object.entries(catalog).filter(
@@ -55,6 +57,8 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
           <Shapes size={17} color="#71819d" />
         )}
       </div>
+      <button className="library-create" onClick={()=>setEditing(null)}><Plus size={15}/> Create / import template</button>
+      {editing !== undefined && <LibraryEditor template={editing ? catalog[editing] : undefined} onClose={()=>setEditing(undefined)}/>}
       <div className="palette-search">
         <Search size={15} />
         <input
@@ -66,7 +70,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
       </div>
       <div className="palette-scroll">
         {groups.map(({ category, items }) => {
-          const CategoryIcon = CATEGORY_ICONS[category];
+          const CategoryIcon = CATEGORY_ICONS[category] || Shapes;
           const closed = collapsed.includes(category) && !search;
           return (
             <section key={category} className="palette-section">
@@ -91,7 +95,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
               </button>
               {!closed &&
                 items.map(([type, info]) => {
-                  const Icon = ICONS[type];
+                  const Icon = ICONS[info.icon] || ICONS[type] || Shapes;
                   return (
                     <div
                       key={type}
@@ -111,6 +115,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                         <span>{info.label}</span>
                         {descriptions[type] && <small>{descriptions[type]}</small>}
                       </div>
+                      <button className="icon-button" aria-label={`Edit template ${info.label}`} onClick={()=>setEditing(type)}>✎</button>
                       <GripVertical className="palette-grip" size={13} />
                       <button
                         className="palette-add"
@@ -132,7 +137,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
           </span>
           <span>
             <strong>Profile library</strong>
-            <small>Local example profiles; future NFDI4Ing MPS integration</small>
+            <small>Persistent SHACL profiles · Turtle import</small>
           </span>
         </div>
       </div>

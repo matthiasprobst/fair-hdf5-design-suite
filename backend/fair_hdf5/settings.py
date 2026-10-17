@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = "info"
     serve_frontend: bool = True
     frontend_dist: Path = PROJECT_ROOT / "frontend" / "dist"
+    data_dir: Path = PROJECT_ROOT / "data"
     temp_dir: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()))
     shacl_engine: Literal["pyshacl", "subset"] = "pyshacl"
     max_upload_bytes: int = Field(default=30_000_000, gt=0)
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     max_dataset_elements: int = Field(default=2_000_000, gt=0)
     max_report_issues: int = Field(default=250, gt=0)
 
-    @field_validator("frontend_dist", "temp_dir", mode="before")
+    @field_validator("frontend_dist", "temp_dir", "data_dir", mode="before")
     @classmethod
     def resolve_path(cls, value):
         path = Path(value).expanduser()

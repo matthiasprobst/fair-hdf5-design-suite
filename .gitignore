@@ -15,3 +15,5 @@ depr/
 *.egg-info/
 /backend/build/
 /backend/dist/
+
+/data/
