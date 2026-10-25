@@ -2,3 +2,6 @@
 # FastAPI TestClient and the existing browser smoke test.
 httpx==0.28.1
 playwright==1.63.0
+
+# Pinned linter and formatter used locally and in CI.
+ruff==0.14.2

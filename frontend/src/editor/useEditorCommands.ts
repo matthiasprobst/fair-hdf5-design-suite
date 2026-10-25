@@ -2,13 +2,16 @@ import { demoWithinLimits } from './limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Dialog } from '../components/Modal';
-import { api, download, jsonFile } from '../lib/api';
-import { editorStore } from './store';
+import { api } from '../lib/api';
+import { download, jsonFile } from '../lib/downloads';
+import { useEditorStore } from './context';
 import { parseBlueprint, toBlueprint } from './adapters';
-import { artifacts } from './lifecycle';
+import { useProjectSession } from '../projects/EditorSessionContext';
 
 /** Editor operations and their cancellation lifecycle, independent of panel layout. */
 export function useEditorCommands(recoveryRaw: string | null) {
+  const editorStore = useEditorStore();
+  const { artifacts } = useProjectSession();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState('');
@@ -22,21 +25,23 @@ export function useEditorCommands(recoveryRaw: string | null) {
     setNotice({ text, error });
     noticeTimer.current = setTimeout(() => setNotice(null), 4500);
   }, []);
+  const cancelPending = useCallback(() => {
+    pending.current?.abort();
+    operation.current++;
+  }, []);
   useEffect(() => {
     const unsubscribe = editorStore.subscribe((s, p) => {
       if (s.semanticRevision !== p.semanticRevision) {
-        pending.current?.abort();
-        operation.current++;
+        cancelPending();
         setBusy('');
       }
     });
     return () => {
       unsubscribe();
-      pending.current?.abort();
-      operation.current++;
+      cancelPending();
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
     };
-  }, []);
+  }, [cancelPending, editorStore]);
   const execute = useCallback(
     async (label: string, fn: (signal: AbortSignal) => Promise<void>) => {
       pending.current?.abort();
@@ -95,7 +100,7 @@ export function useEditorCommands(recoveryRaw: string | null) {
     if (!file) return;
     e.target.value = '';
     await execute('import', async (signal) => {
-      const {catalog, capabilities} = editorStore.getState();
+      const { catalog, capabilities } = editorStore.getState();
       if (!capabilities) throw new Error('Backend limits are not loaded. Retry connection.');
       const content = parseBlueprint(JSON.parse(await file.text()), catalog, capabilities);
       if (signal.aborted) return;
@@ -106,20 +111,36 @@ export function useEditorCommands(recoveryRaw: string | null) {
   const reset = () =>
     void execute('reset', async (signal) => {
       if (!window.confirm('Reset the current experiment to the demonstration blueprint?')) return;
-      const {catalog, capabilities} = editorStore.getState();
+      const { catalog, capabilities } = editorStore.getState();
       if (!capabilities) throw new Error('Backend limits are not loaded. Retry connection.');
-      const content = demoWithinLimits(parseBlueprint(await api.demo(signal), catalog), capabilities);
+      const content = demoWithinLimits(
+        parseBlueprint(await api.demo(signal), catalog),
+        capabilities,
+      );
       if (signal.aborted) return;
       editorStore.getState().replace(content);
       editorStore.getState().select('pressure');
-      onNotice(content.nodes.length ? 'Demo experiment restored.' : 'Empty workspace restored; the demo exceeds the configured limits.');
+      onNotice(
+        content.nodes.length
+          ? 'Demo experiment restored.'
+          : 'Empty workspace restored; the demo exceeds the configured limits.',
+      );
     });
   const onSaveJson = () =>
     jsonFile(toBlueprint(editorStore.getState()), 'experiment-blueprint.json');
   const onLoadFile = () => importRef.current?.click();
   const exportRecovery = () => {
-    if (recoveryRaw !== null)
-      download(new Blob([recoveryRaw], { type: 'application/json' }), 'original-draft.json');
+    if (recoveryRaw !== null) {
+      let content = recoveryRaw;
+      try {
+        const value = JSON.parse(recoveryRaw);
+        if (value && typeof value === 'object' && 'blueprint' in value)
+          content = JSON.stringify(value.blueprint, null, 2);
+      } catch {
+        /* Keep malformed originals available. */
+      }
+      download(new Blob([content], { type: 'application/json' }), 'original-draft.json');
+    }
   };
 
   return {

@@ -13,7 +13,13 @@ import {
   ShieldCheck,
   Upload,
 } from 'lucide-react';
-import { editorStore } from '../store';
+import { useEditorStore } from '../context';
+import { useState as useLocalState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from 'zustand';
+import { useProjectSession, useCanEdit } from '../../projects/EditorSessionContext';
+import { ShareDialog } from '../../projects/ShareDialog';
+import { ModalDialog } from '../../ui/ModalDialog';
 import type { EditorCommands } from '../useEditorCommands';
 
 type Props = {
@@ -24,10 +30,16 @@ type Props = {
   commands: EditorCommands;
 };
 export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, commands }: Props) {
+  const editorStore = useEditorStore();
+  const session = useProjectSession();
+  const state = useStore(session.state);
+  const canEdit = useCanEdit();
+  const navigate = useNavigate();
+  const [sharing, setSharing] = useLocalState(false);
+  const [details, setDetails] = useLocalState(false);
   const [menu, setMenu] = useState<'project' | null>(null);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   const {
-    setDialog,
     onSaveJson,
     onLoadFile,
     exportRecovery,
@@ -41,21 +53,50 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
   return (
     <div className="project-toolbar">
       <div className="project-ident">
-        <button className="project-back" onClick={() => setDialog('projects')} title="Projects">
+        <button
+          className="project-back"
+          aria-label="Back to projects"
+          onClick={() => navigate('/projects')}
+          title="Projects"
+        >
           <ArrowLeft size={18} />
         </button>
         <input
           aria-label="Experiment title"
           className="project-name"
-          value={name === 'Radial fan experiment' ? 'Fan Experiment – HDF5 Design' : name}
+          value={name}
+          readOnly={!canEdit}
+          maxLength={160}
           onChange={(e) => editorStore.getState().rename(e.target.value)}
         />
-        <span className="draft-tag">Draft</span>
+        <span className="draft-tag">{state.project.shared ? 'Shared' : 'Private'}</span>
+        <span className="role-badge">
+          {state.project.role === 'owner'
+            ? 'Owner'
+            : state.project.role === 'editor'
+              ? 'Can edit'
+              : 'Can view'}
+        </span>
         <span className="saved-text">
-          <CircleCheck size={13} /> {storageError ? 'Local save unavailable' : savedAt}
+          {!storageError && <CircleCheck size={13} />} {savedAt}
         </span>
       </div>
       <div className="toolbar-buttons">
+        {state.mode === 'editing' ? (
+          <button
+            className="secondary-btn"
+            disabled={state.busy}
+            onClick={() => void session.finish().catch((e) => commands.onNotice(String(e), true))}
+          >
+            Finish editing
+          </button>
+        ) : state.project.role !== 'viewer' ? (
+          <button className="primary-btn" disabled={state.busy} onClick={() => void session.edit()}>
+            {state.busy ? 'Starting…' : 'Edit project'}
+          </button>
+        ) : (
+          <span className="role-badge">View only</span>
+        )}
         <div
           className="project-menu-wrap"
           onBlur={(event) => {
@@ -82,6 +123,14 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
             <div className="project-dropdown" id="project-actions">
               <button
                 onClick={() => {
+                  setDetails(true);
+                  setMenu(null);
+                }}
+              >
+                Project details
+              </button>
+              <button
+                onClick={() => {
                   onSaveJson();
                   setMenu(null);
                 }}
@@ -89,6 +138,7 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
                 <Save size={15} /> Export blueprint JSON
               </button>
               <button
+                disabled={!canEdit}
                 onClick={() => {
                   onLoadFile();
                   setMenu(null);
@@ -107,6 +157,7 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
                 </button>
               )}
               <button
+                disabled={!canEdit}
                 onClick={() => {
                   reset();
                   setMenu(null);
@@ -125,8 +176,8 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
             </div>
           )}
         </div>
-        <button className="secondary-btn share-btn" onClick={() => setDialog('share')}>
-          <Share2 size={15} /> Share
+        <button className="secondary-btn share-btn" onClick={() => setSharing(true)}>
+          <Share2 size={15} /> {state.project.role === 'owner' ? 'Share' : 'Members'}
         </button>
         <button className="validate-btn" disabled={!!busy} onClick={() => runValidation()}>
           <ShieldCheck size={16} /> Validate
@@ -138,6 +189,34 @@ export function ProjectToolbar({ name, savedAt, storageError, hasRecovery, comma
           <FileCode2 size={16} /> Export HDF5 Template
         </button>
       </div>
+      {sharing && (
+        <ShareDialog
+          project={state.project}
+          onClose={() => setSharing(false)}
+          onChanged={() => void session.refresh()}
+        />
+      )}
+      {details && (
+        <ModalDialog title="Project details" description={name} onClose={() => setDetails(false)}>
+          <div className="app-fields">
+            <label>
+              Description
+              <textarea
+                rows={5}
+                maxLength={3000}
+                readOnly={!canEdit}
+                value={state.project.description}
+                onChange={(e) => session.setDescription(e.target.value)}
+              />
+            </label>
+            <p>
+              {canEdit
+                ? 'Changes are saved automatically.'
+                : 'Start editing to change project details.'}
+            </p>
+          </div>
+        </ModalDialog>
+      )}
     </div>
   );
 }

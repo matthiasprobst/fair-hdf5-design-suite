@@ -1,0 +1,12 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://w3id.org/fair-hdf5-designer/demo/profiles/data-processor> a sh:NodeShape ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "" ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "software" ;
+            sh:order 0 ;
+            sh:path <https://w3id.org/fair-hdf5-designer/demo/metadata#software> ] .
+

@@ -15,3 +15,8 @@ depr/
 *.egg-info/
 /backend/build/
 /backend/dist/
+
+/data/
+
+# Local quality-tool cache
+.ruff_cache/

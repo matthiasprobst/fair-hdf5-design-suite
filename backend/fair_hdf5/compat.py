@@ -1,14 +1,26 @@
 """Compatibility facade. New integrations should use fair_hdf5.services.DesignService."""
+
 from functools import lru_cache
 
 from fair_hdf5.catalog import CATALOG, demo
 from fair_hdf5.domain import parse_shape
 from fair_hdf5.engines import _simple_shacl_check
-from fair_hdf5.profiles import profile_iri as _profile_iri, profile_required as _profile_required
-from fair_hdf5.semantic import rdf_from_hdf5, _meta_key
+from fair_hdf5.profiles import profile_iri as _profile_iri
+from fair_hdf5.profiles import profile_required as _profile_required
+from fair_hdf5.semantic import _meta_key, rdf_from_hdf5
 from fair_hdf5.services import DesignService
 from fair_hdf5.settings import Settings
-from fair_hdf5.vocabulary import ALLOWED_DTYPES, BASE, H5, META, PROFILES, NODE_BASE, SHAPE_BASE, ID_RE, KEY_RE
+from fair_hdf5.vocabulary import (
+    ALLOWED_DTYPES,
+    BASE,
+    H5,
+    ID_RE,
+    KEY_RE,
+    META,
+    NODE_BASE,
+    PROFILES,
+    SHAPE_BASE,
+)
 
 
 @lru_cache(maxsize=1)

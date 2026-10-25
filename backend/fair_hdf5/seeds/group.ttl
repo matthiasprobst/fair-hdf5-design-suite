@@ -1,0 +1,4 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+<https://w3id.org/fair-hdf5-designer/demo/profiles/group> a sh:NodeShape .
+

@@ -24,3 +24,5 @@ backend/tests
 backend/build
 backend/dist
 **/*.egg-info
+
+/data/

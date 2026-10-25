@@ -1,0 +1,453 @@
+{
+  "fan": {
+    "label": "System",
+    "category": "Experiment",
+    "icon": "◉",
+    "profile": "fan",
+    "kind": "group",
+    "color": "purple",
+    "defaults": {
+      "path": "/experiment/equipment/fan",
+      "model": "RF-120",
+      "manufacturer": "Lab demonstrator"
+    },
+    "id": "fan",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/fan",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#model": "model",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer"
+    }
+  },
+  "pressure_sensor": {
+    "label": "Pressure sensor",
+    "category": "Sensor",
+    "icon": "◉",
+    "profile": "pressure-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/pressure_01",
+      "quantity": "pressure",
+      "unit": "Pa",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "P-001",
+      "calibration_date": "2026-02-01"
+    },
+    "id": "pressure_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/pressure-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#calibration_date": "calibration_date",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "temperature_sensor": {
+    "label": "Temperature sensor",
+    "category": "Sensor",
+    "icon": "♨",
+    "profile": "temperature-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/temperature_01",
+      "quantity": "temperature",
+      "unit": "K",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "T-002",
+      "calibration_date": "2026-02-01"
+    },
+    "id": "temperature_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/temperature-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#calibration_date": "calibration_date",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "torque_sensor": {
+    "label": "Torque sensor",
+    "category": "Sensor",
+    "icon": "↻",
+    "profile": "torque-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/torque_01",
+      "quantity": "torque",
+      "unit": "N m",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "Q-003",
+      "calibration_date": "2026-02-01"
+    },
+    "id": "torque_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/torque-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#calibration_date": "calibration_date",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "flow_sensor": {
+    "label": "Flow sensor",
+    "category": "Sensor",
+    "icon": "≋",
+    "profile": "flow-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/flow_01",
+      "quantity": "volumetric flow rate",
+      "unit": "m3/s",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "F-004"
+    },
+    "id": "flow_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/flow-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "daq": {
+    "label": "DAQ / Logger",
+    "category": "Equipment",
+    "icon": "▣",
+    "profile": "data-acquisition",
+    "kind": "group",
+    "color": "green",
+    "defaults": {
+      "path": "/experiment/acquisition/daq_01",
+      "system": "Python acquisition",
+      "sampling_rate_hz": "1000"
+    },
+    "id": "daq",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/data-acquisition",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#system": "system",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#sampling_rate_hz": "sampling_rate_hz"
+    }
+  },
+  "process": {
+    "label": "Processing step",
+    "category": "Process",
+    "icon": "⚙",
+    "profile": "processing",
+    "kind": "group",
+    "color": "amber",
+    "defaults": {
+      "path": "/experiment/processing/write_to_hdf5",
+      "method": "Acquire and write measurements"
+    },
+    "id": "process",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/processing",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
+    }
+  },
+  "group": {
+    "label": "HDF5 group",
+    "category": "HDF5 structure",
+    "icon": "▤",
+    "profile": "group",
+    "kind": "group",
+    "color": "rose",
+    "defaults": {
+      "path": "/experiment"
+    },
+    "id": "group",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/group",
+    "mapping": {}
+  },
+  "dataset": {
+    "label": "HDF5 dataset",
+    "category": "HDF5 structure",
+    "icon": "▥",
+    "profile": "dataset",
+    "kind": "dataset",
+    "color": "rose",
+    "defaults": {
+      "path": "/experiment/measurements/velocity",
+      "quantity": "velocity",
+      "unit": "m/s",
+      "dtype": "float64",
+      "shape": "0"
+    },
+    "id": "dataset",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/dataset",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "metadata": {
+    "label": "Experiment metadata",
+    "category": "Metadata",
+    "icon": "≡",
+    "profile": "experiment-metadata",
+    "kind": "group",
+    "color": "violet",
+    "defaults": {
+      "path": "/experiment/metadata",
+      "operator": "Lab researcher",
+      "experiment_date": "2026-10-13"
+    },
+    "id": "metadata",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/experiment-metadata",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#operator": "operator",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#experiment_date": "experiment_date"
+    }
+  },
+  "experiment_setup": {
+    "label": "Experimental setup",
+    "category": "Experiment",
+    "icon": "◈",
+    "profile": "experimental-setup",
+    "kind": "group",
+    "color": "purple",
+    "defaults": {
+      "path": "/experiment/setup",
+      "description": "Experimental test rig"
+    },
+    "id": "experiment_setup",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/experimental-setup",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#description": "description"
+    }
+  },
+  "boundary_condition": {
+    "label": "Boundary condition",
+    "category": "Experiment",
+    "icon": "◈",
+    "profile": "boundary-condition",
+    "kind": "group",
+    "color": "purple",
+    "defaults": {
+      "path": "/experiment/boundary_conditions/condition_01",
+      "condition_name": "Inlet condition"
+    },
+    "id": "boundary_condition",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/boundary-condition",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#condition_name": "condition_name"
+    }
+  },
+  "vibration_sensor": {
+    "label": "Vibration sensor",
+    "category": "Sensor",
+    "icon": "~",
+    "profile": "vibration-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/vibration_01",
+      "quantity": "acceleration",
+      "unit": "m/s2",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "V-005"
+    },
+    "id": "vibration_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/vibration-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "custom_sensor": {
+    "label": "Custom sensor",
+    "category": "Sensor",
+    "icon": "◉",
+    "profile": "custom-sensor",
+    "kind": "group",
+    "color": "blue",
+    "defaults": {
+      "path": "/experiment/instrumentation/custom_01",
+      "quantity": "measured quantity",
+      "unit": "1",
+      "manufacturer": "Demo Instruments",
+      "serial_number": "S-006"
+    },
+    "id": "custom_sensor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/custom-sensor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#manufacturer": "manufacturer",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#serial_number": "serial_number",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#quantity": "quantity",
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#unit": "unit"
+    }
+  },
+  "controller": {
+    "label": "Controller",
+    "category": "Equipment",
+    "icon": "▣",
+    "profile": "controller",
+    "kind": "group",
+    "color": "green",
+    "defaults": {
+      "path": "/experiment/equipment/controller_01",
+      "model": "Controller demonstrator"
+    },
+    "id": "controller",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/controller",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#model": "model"
+    }
+  },
+  "power_supply": {
+    "label": "Power supply",
+    "category": "Equipment",
+    "icon": "▣",
+    "profile": "power-supply",
+    "kind": "group",
+    "color": "green",
+    "defaults": {
+      "path": "/experiment/equipment/power_supply_01",
+      "model": "Power supply demonstrator"
+    },
+    "id": "power_supply",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/power-supply",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#model": "model"
+    }
+  },
+  "data_processor": {
+    "label": "Data processor",
+    "category": "Equipment",
+    "icon": "▣",
+    "profile": "data-processor",
+    "kind": "group",
+    "color": "green",
+    "defaults": {
+      "path": "/experiment/equipment/data_processor_01",
+      "software": "Python"
+    },
+    "id": "data_processor",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/data-processor",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#software": "software"
+    }
+  },
+  "data_processing": {
+    "label": "Data processing",
+    "category": "Process",
+    "icon": "⚙",
+    "profile": "processing",
+    "kind": "group",
+    "color": "amber",
+    "defaults": {
+      "path": "/experiment/processing/data_processing_01",
+      "method": "Processing step"
+    },
+    "id": "data_processing",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/processing",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
+    }
+  },
+  "filter_process": {
+    "label": "Filtering / averaging",
+    "category": "Process",
+    "icon": "⚙",
+    "profile": "filtering",
+    "kind": "group",
+    "color": "amber",
+    "defaults": {
+      "path": "/experiment/processing/filtering_01",
+      "method": "Averaging"
+    },
+    "id": "filter_process",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/filtering",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
+    }
+  },
+  "unit_conversion": {
+    "label": "Unit conversion",
+    "category": "Process",
+    "icon": "⚙",
+    "profile": "unit-conversion",
+    "kind": "group",
+    "color": "amber",
+    "defaults": {
+      "path": "/experiment/processing/unit_conversion_01",
+      "method": "Unit conversion"
+    },
+    "id": "unit_conversion",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/unit-conversion",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
+    }
+  },
+  "custom_process": {
+    "label": "Custom process",
+    "category": "Process",
+    "icon": "⚙",
+    "profile": "custom-process",
+    "kind": "group",
+    "color": "amber",
+    "defaults": {
+      "path": "/experiment/processing/custom_process_01",
+      "method": "Custom process"
+    },
+    "id": "custom_process",
+    "revision": 1,
+    "shape": "https://w3id.org/fair-hdf5-designer/demo/profiles/custom-process",
+    "mapping": {
+      "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
+    }
+  },
+  "research_project": {
+    "label": "m4i Research Project",
+    "category": "Metadata",
+    "icon": "metadata",
+    "profile": "research_project",
+    "kind": "group",
+    "color": "violet",
+    "defaults": {
+      "path": "/experiment/metadata/research_project"
+    },
+    "id": "research_project",
+    "revision": 1,
+    "shape": "https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/",
+    "source_uri": "https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/",
+    "requires_pyshacl": true,
+    "mapping": {
+      "http://www.w3.org/2000/01/rdf-schema#label": "project_name",
+      "http://schema.org/description": "description",
+      "http://w3id.org/nfdi4ing/metadata4ing#projectReferenceID": "project_reference_id",
+      "http://w3id.org/nfdi4ing/metadata4ing#startOfProject": "start_date",
+      "http://w3id.org/nfdi4ing/metadata4ing#endOfProject": "end_date",
+      "http://w3id.org/nfdi4ing/metadata4ing#projectParticipant": "participants"
+    }
+  }
+}

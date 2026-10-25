@@ -17,3 +17,6 @@ namespaces = false
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.package-data]
+fair_hdf5 = ["seeds/*.json", "seeds/*.ttl", "migrations/*.sql"]
