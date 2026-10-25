@@ -1,13 +1,30 @@
-// Bundle TypeScript tests using Vite's installed compiler; run with Node's test runner.
+// Discover every TypeScript test and run them in this process with node:test.
 import { build } from 'esbuild';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-const directory=await mkdtemp(join(tmpdir(),'fair-editor-tests-'));
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const directory = await mkdtemp(join(tmpdir(), 'fair-editor-tests-'));
 try {
-  const outfile=join(directory,'editor.test.cjs');
-  await build({entryPoints:['tests/editor.test.ts'],outfile,bundle:true,platform:'node',format:'cjs',logLevel:'warning'});
-  const result=spawnSync(process.execPath,[outfile],{stdio:'inherit'});
-  process.exitCode=result.status??1;
-} finally {await rm(directory,{recursive:true,force:true});}
+  const tests = (await readdir('tests', { recursive: true }))
+    .filter((name) => name.endsWith('.test.ts'))
+    .sort();
+  if (!tests.length) throw new Error('No TypeScript tests found.');
+  const outfile = join(directory, 'tests.cjs');
+  await build({
+    stdin: {
+      contents: tests.map((name) => `import ${JSON.stringify(resolve('tests', name))};`).join('\n'),
+      resolveDir: process.cwd(),
+    },
+    outfile,
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    logLevel: 'warning',
+  });
+  // node:test registers the tests on import and sets the process exit code on failure.
+  await import(pathToFileURL(outfile).href);
+} finally {
+  await rm(directory, { recursive: true, force: true });
+}

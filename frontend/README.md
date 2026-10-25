@@ -67,3 +67,34 @@ The existing `hideAttribution` React Flow setting produces a development-only
 library notice with current installed versions. Browser tests exclude that
 specific known notice, also reproduced on the original frontend; other console
 warnings/errors still fail. The setting itself is unchanged by this refactor.
+
+## Feature and data boundaries
+
+- `lib/api` owns HTTP transport and error messages. `lib/contracts` checks backend
+  JSON before it enters application state; `lib/validation` supplies shared type
+  guards. API JSON starts as `unknown`.
+- `editor/blueprint` validates editable import/storage envelopes; scientific errors
+  remain editable and are reported by the backend. `editor/adapters` converts
+  between blueprints and React Flow, copying mutable values at the boundary.
+- `editor/rules` owns IDs, paths, required fields, and relationship suggestions.
+  Browser downloads live in `lib/downloads`.
+- `library/useLibraryEditor` owns library form state and cancellable network
+  operations. `library/draft` prepares publication payloads without mutating old
+  revisions. `TurtleImport` and `TemplateFields` render the two cohesive form sections.
+- `EditorInspector` connects selected state and upgrade commands to `Inspector`.
+  `EditorReferenceFields` connects reference actions to `ReferenceFields`.
+  Presentational components receive data and callbacks instead of calling the API.
+- `editor/store` applies synchronous graph operations. Creating a linked node and
+  its edge is one state transition. Publishing a catalog revision does not upgrade
+  existing nodes; the explicit upgrade command uses normal artifact invalidation
+  and stale-response handling.
+
+Distinguish `TemplateDraft`, `TemplateSnapshot`, and legacy `CatalogItem` data.
+Persist only published snapshots. Keep view state out of the blueprint. Add new
+TypeScript tests anywhere under `tests/` using `*.test.ts`; the runner discovers
+all files, and TypeScript checks both application and test code.
+
+Run `npm run check --prefix frontend` for lint, formatting, type checking, tests,
+and the build. `npm run format --prefix frontend` applies formatting. ESLint
+checks hook usage and dependencies; Prettier owns layout and quote style.
+Development tooling requires Node.js 20.19+.

@@ -16,7 +16,7 @@ Workflow connections describe experimental relationships. HDF5 paths describe th
 
 ## Project status and scope
 
-This is a local research prototype, not a production or multi-user service. Its metadata profile catalog is illustrative and local; it does not connect to the NFDI4Ing Metadata Profile Service (MPS). Profile URIs are not resolved or verified against live profiles.
+This is a local research prototype, not a production or multi-user service. Its library includes illustrative local templates and supports importing MPS Turtle profiles with pinned dependencies. It has no live MPS catalog discovery or automatic synchronization.
 
 Validation checks the HDF5 structure, datatypes, shapes, and configured metadata, and checks an RDF representation against generated SHACL constraints. Passing validation does not establish that measurements are scientifically correct or that a dataset is fully FAIR.
 
@@ -121,6 +121,35 @@ python -m fair_hdf5
 ```
 
 Open <http://127.0.0.1:8000>. FastAPI serves the built React app from `frontend/dist/`. If the build is missing, the API root returns a setup message; during development, use the Vite address above.
+
+## Development quality checks
+
+Use Python 3.10+ and Node.js 20.19+ (Node 22 is used in the container). Install
+backend development dependencies and the locked frontend packages, then run:
+
+```bash
+python -m pip install -e ./backend -r backend/requirements-dev.txt
+npm ci --prefix frontend
+ruff check .
+ruff format --check .
+python -m unittest discover -s backend/tests -v
+npm run check --prefix frontend
+```
+
+`npm run check` runs ESLint, Prettier, TypeScript (including test files), frontend
+unit tests, and the production build. Apply formatting with `ruff format .` and
+`npm run format --prefix frontend`. Ruff covers the backend, compatibility entry
+point, and browser tests; frontend formatting covers source, tests, and tool
+configuration. Generated assets and example datasets are excluded.
+
+GitHub Actions runs these checks on pushes and pull requests, with Python
+3.10/3.12 and Node 20/22. A separate Chromium job tests the built application,
+including library publication, template upgrades, linked profiles, editing,
+persistence, and panel layout. It uploads screenshots and the test-server log.
+Backend tests create temporary catalogs and never modify the local library.
+
+See [backend responsibilities](backend/README.md#responsibilities) and
+[frontend structure](frontend/README.md) before adding new behavior.
 
 ## Repository layout
 
@@ -298,13 +327,16 @@ explicit revision update with rule review and validation. Updating retains
 existing values and adds new defaults; validation may report fields requiring
 attention. Importing a design does not publish its snapshots into the library.
 
-Supported SHACL: named NodeShapes with direct property IRIs; `maxCount 1` and
-`minCount 0/1`; string, boolean, integer, decimal, double, date, dateTime and IRI
-values; `in`, `hasValue`, numeric bounds, string lengths and regex patterns
-(flags i/m/s/x); labels, descriptions, order, groups and defaults. Datatypes or
-IRI node kind must be explicit. Unsupported constraints, nested shapes,
-multivalued properties, complex paths and SPARQL are rejected with an explanation.
-Only Turtle is imported; parsing never retrieves remote contexts or imports.
+Supported SHACL includes named NodeShapes with direct property IRIs, scalar and
+repeated literal fields, explicit cardinalities, linked named shapes through
+`sh:node` or qualified shape declarations, `sh:class` IRI fields, and `sh:xone`
+alternatives of `xsd:integer` and `xsd:double`. Literal types include string,
+boolean, integer, decimal, double, date, dateTime and IRI. Selection lists, fixed
+values, numeric bounds, string lengths, regex patterns, labels, descriptions and
+defaults are supported. See the MPS section below for dependency behavior.
+Complex paths, closed shapes, logical composition and SPARQL are rejected.
+Turtle imports resolve dependencies explicitly during analysis; reopening or
+validating a saved template uses only its pinned local bundle.
 A file may contain multiple named shapes; select one for the template.
 
 Source targeting is replaced by explicit targeting of each corresponding
@@ -326,6 +358,81 @@ explicit legacy subset mode cannot validate custom profiles.
   "template": { ... } }`; stale revisions return HTTP 409.
 - `GET /api/catalog/{id}/revisions/{revision}`: retrieve an immutable snapshot.
 
-MPS discovery/synchronization, JSON-LD and nested profiles are not included.
+MPS catalog discovery, automatic synchronization and JSON-LD are not included.
 Compatibility with a specific MPS export must be checked against that file;
 no complete MPS compatibility is claimed.
+
+### MPS research projects, people and organizations
+
+`examples/profiles/research_project.ttl` is a self-contained Turtle bundle based
+on the MPS Research Project, Person and Organization profiles. It is also
+packaged as the built-in **m4i Research Project** template in the **Metadata**
+palette category, so it is available in existing installations without a live
+MPS request. The importer can also analyze the example directly. The inspector
+offers **Create linked node** and existing-node selectors for participating
+people and organizations. A Person node similarly offers organization
+affiliations. Selecting a linked node opens its own metadata.
+
+The importer preserves multiple language labels (English preferred), multiline
+text hints, literal lists, `sh:node` and qualified-shape references. Missing
+`sh:maxCount` means repeatable values, including first and last names in the MPS
+Person profile. Both project participant selectors share `m4i:projectParticipant`
+in RDF and one HDF5 object-reference attribute. Semantic edges carry a field ID
+and predicate; ordinary workflow connections remain independent.
+
+Repeated literals use one-dimensional HDF5 attributes. Linked nodes use HDF5
+object references, created after all objects exist. Validation reads these
+references from the uploaded HDF5 file and reports missing/dangling targets,
+wrong attribute representations and relationships that differ from the design.
+Every node is also independently validated against its own pinned profile.
+
+The project contains qualified-shape declarations without qualified counts.
+These describe reference choices but add no SHACL count constraint. Original
+Turtle is preserved; the executable SHACL projection omits these inert
+qualified-shape annotations because pySHACL rejects them without counts. It does
+not add `sh:node` or mandatory participant counts. Explicit qualified counts and
+`sh:node` constraints are retained and executed. `sh:closed false` is supported;
+closed shapes, complex property paths, logical composition and SPARQL remain
+unsupported.
+
+Snapshot schema 2 adds pinned dependency documents, referenced templates, field
+IDs, cardinalities and target classes; schema 1 snapshots are read and upgraded
+in memory. Snapshots carry the referenced shape documents needed to reopen and
+validate offline.
+Dependency templates are included in the saved root template and can be
+instantiated from its inspector without separately publishing mutable copies.
+
+For offline import, use **Supply a dependency file** with the exact import URI.
+Unchanged reference downloads and a complete `/api/catalog/analyze` JSON request
+are included in `examples/profiles/mps-dependencies/`. The `offline-import.json`
+request contains both dependency documents and hashes, so it requires no network
+access. The original files declare CC0-1.0 licensing.
+
+Network retrieval fetches only imported documents referenced by `sh:node` or
+`sh:qualifiedValueShape`. Other ontology imports, such as large QUDT vocabulary
+graphs, are left out unless the user supplies them as dependency files. This
+keeps profile analysis bounded; if an omitted vocabulary supplies RDF type facts
+needed by `sh:class`, provide a smaller Turtle subset containing those facts.
+The analyzer reports imports it did not bundle. Fetches use public HTTPS
+endpoints, validate redirects and TLS certificates, and pin the resolved IP for
+each connection. HTTP import IRIs are upgraded to HTTPS for the initial fetch
+while their original IRIs remain the bundle keys; HTTPS redirects are required.
+Downloads happen only during explicit import analysis. Missing referenced shape
+documents or cycles block saving; no automatic dependency refresh occurs when
+loading or validating a design.
+The following settings control retrieval:
+
+| Environment variable | Default |
+| --- | --- |
+| `FAIR_HDF5_PROFILE_FETCH_TIMEOUT` | 10 seconds |
+| `FAIR_HDF5_PROFILE_MAX_REDIRECTS` | 5 |
+| `FAIR_HDF5_PROFILE_MAX_DEPTH` | 8 |
+| `FAIR_HDF5_PROFILE_MAX_DOCUMENTS` | 16 |
+| `FAIR_HDF5_PROFILE_MAX_DOCUMENT_BYTES` | 1000000 |
+| `FAIR_HDF5_PROFILE_MAX_TOTAL_BYTES` | 8000000 |
+
+`POST /api/catalog/analyze` now accepts optional `source_uri` and `documents`
+(a map of requested URI to `{ttl, hash?, resolved_url?}`). Its response includes
+resolved documents and per-shape field models. Publishing a template accepts the
+same pinned documents. A missing pinned dependency is an error at publication;
+publication never downloads a newer version in place of the reviewed content.

@@ -15,7 +15,9 @@ import '../styles/editor.css';
 
 export function EditorView() {
   const initialized = useEditor((state) => state.initialized);
-  const limitError = useEditor((state) => state.initialized ? graphLimitError(state, state.capabilities) : '');
+  const limitError = useEditor((state) =>
+    state.initialized ? graphLimitError(state, state.capabilities) : '',
+  );
   const name = useEditor((state) => state.name);
   const { apiError, storageError, savedAt, recoveryRaw } = useEditorLifecycle();
   const commands = useEditorCommands(recoveryRaw);

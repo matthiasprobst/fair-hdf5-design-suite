@@ -27,7 +27,7 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
 
   const addNode = useCallback(
     (type: NodeType, x: number, y: number) => {
-      const {nodes, capabilities} = editorStore.getState();
+      const { nodes, capabilities } = editorStore.getState();
       if (!capabilities) return;
       if (nodes.length >= capabilities.max_nodes) {
         onNotice(`The blueprint limit is ${capabilities.max_nodes} blocks.`, true);

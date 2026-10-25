@@ -28,12 +28,17 @@ interface Props {
   onClose?: () => void;
 }
 export default function Palette({ catalog, onAdd, onClose }: Props) {
-  const [editing, setEditing] = useState<string|null|undefined>(undefined);
+  const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const groups = useMemo(
     () =>
-      [...order, ...Array.from(new Set(Object.values(catalog).map(i=>i.category))).filter(c=>!order.includes(c))]
+      [
+        ...order,
+        ...Array.from(new Set(Object.values(catalog).map((i) => i.category))).filter(
+          (c) => !order.includes(c),
+        ),
+      ]
         .map((category) => ({
           category,
           items: Object.entries(catalog).filter(
@@ -57,8 +62,15 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
           <Shapes size={17} color="#71819d" />
         )}
       </div>
-      <button className="library-create" onClick={()=>setEditing(null)}><Plus size={15}/> Create / import template</button>
-      {editing !== undefined && <LibraryEditor template={editing ? catalog[editing] : undefined} onClose={()=>setEditing(undefined)}/>}
+      <button className="library-create" onClick={() => setEditing(null)}>
+        <Plus size={15} /> Create / import template
+      </button>
+      {editing !== undefined && (
+        <LibraryEditor
+          template={editing ? catalog[editing] : undefined}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
       <div className="palette-search">
         <Search size={15} />
         <input
@@ -115,7 +127,13 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                         <span>{info.label}</span>
                         {descriptions[type] && <small>{descriptions[type]}</small>}
                       </div>
-                      <button className="icon-button" aria-label={`Edit template ${info.label}`} onClick={()=>setEditing(type)}>✎</button>
+                      <button
+                        className="icon-button"
+                        aria-label={`Edit template ${info.label}`}
+                        onClick={() => setEditing(type)}
+                      >
+                        ✎
+                      </button>
                       <GripVertical className="palette-grip" size={13} />
                       <button
                         className="palette-add"

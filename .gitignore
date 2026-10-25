@@ -17,3 +17,6 @@ depr/
 /backend/dist/
 
 /data/
+
+# Local quality-tool cache
+.ruff_cache/

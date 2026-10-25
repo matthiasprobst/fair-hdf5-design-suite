@@ -1,6 +1,7 @@
 """Validated startup configuration. Settings are owned by each application instance."""
-from pathlib import Path
+
 import tempfile
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -12,8 +13,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="FAIR_HDF5_", env_file=PROJECT_ROOT / ".env",
-        env_file_encoding="utf-8", extra="ignore", frozen=True,
+        env_prefix="FAIR_HDF5_",
+        env_file=PROJECT_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        frozen=True,
     )
 
     host: str = Field(default="127.0.0.1", min_length=1)
@@ -25,6 +29,12 @@ class Settings(BaseSettings):
     temp_dir: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()))
     shacl_engine: Literal["pyshacl", "subset"] = "pyshacl"
     max_upload_bytes: int = Field(default=30_000_000, gt=0)
+    profile_fetch_timeout: float = Field(default=10, gt=0)
+    profile_max_redirects: int = Field(default=5, ge=0)
+    profile_max_depth: int = Field(default=8, ge=0)
+    profile_max_documents: int = Field(default=16, gt=0)
+    profile_max_document_bytes: int = Field(default=1_000_000, gt=0)
+    profile_max_total_bytes: int = Field(default=8_000_000, gt=0)
     max_nodes: int = Field(default=250, gt=0)
     max_edges: int = Field(default=1000, gt=0)
     max_metadata_length: int = Field(default=3000, gt=0)

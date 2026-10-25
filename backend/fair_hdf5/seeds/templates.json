@@ -425,5 +425,29 @@
     "mapping": {
       "https://w3id.org/fair-hdf5-designer/demo/metadata#method": "method"
     }
+  },
+  "research_project": {
+    "label": "m4i Research Project",
+    "category": "Metadata",
+    "icon": "metadata",
+    "profile": "research_project",
+    "kind": "group",
+    "color": "violet",
+    "defaults": {
+      "path": "/experiment/metadata/research_project"
+    },
+    "id": "research_project",
+    "revision": 1,
+    "shape": "https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/",
+    "source_uri": "https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/",
+    "requires_pyshacl": true,
+    "mapping": {
+      "http://www.w3.org/2000/01/rdf-schema#label": "project_name",
+      "http://schema.org/description": "description",
+      "http://w3id.org/nfdi4ing/metadata4ing#projectReferenceID": "project_reference_id",
+      "http://w3id.org/nfdi4ing/metadata4ing#startOfProject": "start_date",
+      "http://w3id.org/nfdi4ing/metadata4ing#endOfProject": "end_date",
+      "http://w3id.org/nfdi4ing/metadata4ing#projectParticipant": "participants"
+    }
   }
 }

@@ -1,14 +1,16 @@
 """HTTP transport only. Synchronous handlers run processing in FastAPI's worker pool."""
-import json
-from typing import Annotated, Literal
-from fastapi import APIRouter, Depends, File, Form, Request, HTTPException, UploadFile
-from fastapi.responses import Response
-from pydantic import BaseModel
 
-from .catalog import CATALOG, demo
+import json
+from typing import Annotated, Any, Literal
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from .catalog import demo
 from .domain import BlueprintInput
 from .errors import DesignError
-from .services import DesignService
+from .services import CatalogService, DesignService
 
 router = APIRouter(prefix="/api")
 
@@ -20,6 +22,13 @@ def get_service(request: Request) -> DesignService:
 Service = Annotated[DesignService, Depends(get_service)]
 
 
+def get_catalog_service(request: Request) -> CatalogService:
+    return request.app.state.catalog_service
+
+
+Catalog = Annotated[CatalogService, Depends(get_catalog_service)]
+
+
 class CapabilitiesOutput(BaseModel):
     max_nodes: int
     max_edges: int
@@ -28,45 +37,39 @@ class CapabilitiesOutput(BaseModel):
 
 
 @router.get("/catalog")
-def catalog(service: Service):
-    return {"catalog": service.repository.catalog(), "legacy_catalog": {key:service.repository.get(key, 1) for key in CATALOG}, "profile_source": "Persistent local SHACL library; MPS file import supported"}
+def catalog(service: Catalog):
+    return service.catalog()
 
 
 class ProfileImport(BaseModel):
     ttl: str
+    source_uri: str | None = None
+    documents: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/catalog/analyze")
-def analyze_profile(body: ProfileImport):
-    from .profile_schema import analyze_profile
-    return analyze_profile(body.ttl)
+def analyze_profile(body: ProfileImport, service: Catalog):
+    return service.analyze(body.ttl, body.source_uri, body.documents)
 
 
 @router.post("/catalog", status_code=201)
-def create_template(body: dict, service: Service):
-    if service.settings.shacl_engine != "pyshacl":
-        raise DesignError("Custom profiles require pyshacl.")
-    return service.repository.publish(body)
+def create_template(body: dict[str, Any], service: Catalog):
+    return service.publish(body)
 
 
 class TemplateRevision(BaseModel):
     expected_revision: int
-    template: dict
+    template: dict[str, Any]
 
 
 @router.post("/catalog/{identifier}/revisions", status_code=201)
-def publish_revision(identifier: str, body: TemplateRevision, service: Service):
-    from .library import RevisionConflict
-    if service.settings.shacl_engine != "pyshacl": raise DesignError("Custom profiles require pyshacl.")
-    try:
-        return service.repository.publish(body.template, identifier, body.expected_revision)
-    except RevisionConflict as exc:
-        raise HTTPException(409, str(exc)) from exc
+def publish_revision(identifier: str, body: TemplateRevision, service: Catalog):
+    return service.publish(body.template, identifier, body.expected_revision)
 
 
 @router.get("/catalog/{identifier}/revisions/{revision}")
-def get_revision(identifier: str, revision: int, service: Service):
-    return service.repository.get(identifier, revision)
+def get_revision(identifier: str, revision: int, service: Catalog):
+    return service.get_revision(identifier, revision)
 
 
 @router.get("/demo")
@@ -86,14 +89,20 @@ def preview(service: Service, blueprint: BlueprintInput):
 
 @router.post("/export/shacl")
 def export_shacl(service: Service, blueprint: BlueprintInput):
-    return Response(service.shacl(blueprint), media_type="text/turtle",
-                    headers={"Content-Disposition": 'attachment; filename="hdf5-design.shacl.ttl"'})
+    return Response(
+        service.shacl(blueprint),
+        media_type="text/turtle",
+        headers={"Content-Disposition": 'attachment; filename="hdf5-design.shacl.ttl"'},
+    )
 
 
 @router.post("/export/hdf5")
 def export_hdf5(service: Service, blueprint: BlueprintInput):
-    return Response(service.template(blueprint), media_type="application/x-hdf5",
-                    headers={"Content-Disposition": 'attachment; filename="experiment-template.h5"'})
+    return Response(
+        service.template(blueprint),
+        media_type="application/x-hdf5",
+        headers={"Content-Disposition": 'attachment; filename="experiment-template.h5"'},
+    )
 
 
 @router.post("/validate/template")

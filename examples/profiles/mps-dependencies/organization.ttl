@@ -1,0 +1,29 @@
+@base <https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/>.
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+<http://www.w3.org/ns/prov#Organization> rdfs:subClassOf <http://www.w3.org/ns/prov#Agent>.
+<https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/> <http://purl.org/dc/terms/created> "2025-10-08"^^xsd:date;
+                                                                           <http://purl.org/dc/terms/creator> "Metadata4Ing";
+                                                                           <http://purl.org/dc/terms/description> "a social or legal institution such as a company, society, etc."@en;
+                                                                           <http://purl.org/dc/terms/license> <http://spdx.org/licenses/CC0-1.0>;
+                                                                           <http://purl.org/dc/terms/title> "m4i Organization"@en,
+                                                                                                            "m4i Organisation"@de;
+                                                                           a <http://www.w3.org/ns/shacl#NodeShape>;
+                                                                           <http://www.w3.org/ns/shacl#closed> false;
+                                                                           <http://www.w3.org/ns/shacl#property> [<http://www.w3.org/ns/shacl#path> <http://w3id.org/nfdi4ing/metadata4ing#hasRorId> ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#datatype> xsd:string ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#name> "ROR ID"@en ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#name> "ROR-ID"@de ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#order> 2  ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#maxCount> 1 ],
+                                                                                                                 [<http://www.w3.org/ns/shacl#order> 1  ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#name> "Name"@de ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#maxCount> 1  ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#name> "Name"@en ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#minCount> 1  ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#datatype> xsd:string ; 
+                                                                                                                  <http://www.w3.org/ns/shacl#path> rdfs:label];
+                                                                           <http://www.w3.org/ns/shacl#targetClass> <http://www.w3.org/ns/prov#Organization>.

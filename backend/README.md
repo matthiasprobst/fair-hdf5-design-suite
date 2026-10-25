@@ -26,12 +26,28 @@ Python integrations import `fair_hdf5.catalog` for catalog/demo data and
 
 ## Responsibilities
 
-- `application` creates the FastAPI app; `api` owns HTTP transport.
-- `services` coordinates preview, export, and validation.
-- `domain`, `catalog`, `profiles`, and `vocabulary` own blueprint rules and definitions.
-- `hdf5` handles HDF5 generation, files, and structural checks.
-- `semantic` builds RDF/SHACL graphs; `engines` executes semantic validation.
-- `settings` validates configuration; `compat` maintains the legacy function API.
+- `application` creates the FastAPI app and wires shared dependencies; `api` owns HTTP transport.
+- `services.DesignService` coordinates preview, export, and validation.
+- `services.CatalogService` coordinates profile analysis and template publication. Both HTTP and Python callers use these services for application behavior.
+- `domain` parses blueprint envelopes and checks scientific/storage constraints; `templates` normalizes portable snapshots and derives related profiles. Neither imports the file repository.
+- `repositories` defines the storage protocol; `library` implements immutable file storage, caching, locking, and atomic revision checks.
+- `catalog`, `profiles`, and `vocabulary` provide seed definitions and shared profile access.
+- `profile_schema` compiles supported SHACL form fields; `profile_bundles` resolves pinned dependencies and bounds explicit network imports.
+- `hdf5` handles file generation, uploaded files, and structural checks; `semantic` projects metadata to RDF and builds shapes; `engines` executes SHACL validation.
+- `settings` validates configuration; `errors` contains domain errors; `compat` preserves the legacy function API.
+
+Keep dependencies directed toward the shared rules and storage contracts. HTTP
+handlers translate transport inputs and delegate; they do not compile profiles
+or call the repository. Services prepare and validate snapshots before storing
+them. The file repository rechecks the expected revision under its process/file
+lock, so concurrent writers cannot overwrite an existing revision. Reads return
+independent snapshots; published files are never edited in place.
+
+Retain extensible blueprint fields and the supported snapshot schemas when
+changing models. Add behavior tests at the relevant service boundary and HTTP
+contract tests when status codes or response handling are affected. Test fixtures
+inherit the catalog isolation helpers in `tests/support.py`, including async tests.
+Network-import tests use controlled responses and do not require live providers.
 
 `pyproject.toml` reads runtime dependencies from `requirements.txt`, keeping
 version constraints in one place. `requirements-shacl.txt` remains a compatibility
@@ -44,6 +60,8 @@ From the repository root:
 ```bash
 python -m pip install -e ./backend -r backend/requirements-dev.txt
 python -m unittest discover -s backend/tests -v
+ruff check .
+ruff format --check .
 ```
 
 From this directory, use `python -m unittest discover -s tests -v` instead.

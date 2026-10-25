@@ -1,65 +1,120 @@
 @prefix dash: <http://datashapes.org/dash#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix m4i: <http://w3id.org/nfdi4ing/metadata4ing#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix schema: <http://schema.org/> .
+@prefix schema: <https://schema.org/> .
+@prefix schema1: <http://schema.org/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix aps: <https://w3id.org/nfdi4ing/profiles/> .
 
-<https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/> dcterms:created "2025-10-08"^^xsd:date ;
-	dcterms:creator "Metadata4Ing" ;
-	dcterms:description "A research project"@en, "Ein Forschungsprojekt"@de ;
-	dcterms:license <http://spdx.org/licenses/CC0-1.0> ;
-	dcterms:title "m4i Research Project"@en, "m4i Forschungsprojekt"@de ;
-	a sh:NodeShape ;
-	owl:imports <https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/>, <https://w3id.org/nfdi4ing/profiles/e18a558c-03a2-4a89-9cfb-656aad6f6644/1767883664018/> ;
-	sh:closed false ;
-	sh:property [
-		sh:datatype xsd:date ;
-		sh:maxCount 1 ;
-		sh:order 7 ;
-		sh:path m4i:endOfProject ;
-		sh:name "has end date"@en ;
-	], [
-		sh:datatype xsd:string ;
-		sh:maxCount 1 ;
-		sh:order 1 ;
-		sh:path rdfs:label ;
-		sh:name "name"@en ;
-		sh:minCount 1 ;
-	], [
-		sh:order 5 ;
-		sh:path m4i:projectParticipant ;
-		sh:name "has participating organization"@en ;
-		sh:qualifiedValueShape <https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/> ;
-	], [
-		sh:datatype xsd:date ;
-		sh:maxCount 1 ;
-		sh:order 6 ;
-		sh:path m4i:startOfProject ;
-		sh:name "has start date"@en ;
-	], [
-		sh:order 4 ;
-		sh:path m4i:projectParticipant ;
-		sh:name "has participating person"@en ;
-		sh:qualifiedValueShape <https://w3id.org/nfdi4ing/profiles/e18a558c-03a2-4a89-9cfb-656aad6f6644/1767883664018/> ;
-	], [
-		sh:datatype xsd:string ;
-		sh:maxCount 1 ;
-		sh:order 2 ;
-		sh:path schema:description ;
-		sh:name "description"@en ;
-		dash:singleLine false ;
-	], [
-		sh:datatype xsd:string ;
-		sh:maxCount 1 ;
-		sh:order 3 ;
-		sh:path m4i:projectReferenceID ;
-		sh:name "has project ID"@en ;
-		sh:minCount 1 ;
-	] ;
-	sh:targetClass <https://schema.org/ResearchProject> .
+<https://w3id.org/nfdi4ing/profiles/56aebc37-dbb9-4a02-9cb8-1b7f58c2b91a/> a sh:NodeShape ;
+    dcterms:created "2025-10-08"^^xsd:date ;
+    dcterms:creator "Metadata4Ing" ;
+    dcterms:description "Ein Forschungsprojekt"@de,
+        "A research project"@en ;
+    dcterms:license <http://spdx.org/licenses/CC0-1.0> ;
+    dcterms:title "m4i Forschungsprojekt"@de,
+        "m4i Research Project"@en ;
+    sh:closed false ;
+    sh:property [ sh:datatype xsd:date ;
+            sh:maxCount 1 ;
+            sh:name "has end date"@en ;
+            sh:order 7 ;
+            sh:path m4i:endOfProject ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "name"@en ;
+            sh:order 1 ;
+            sh:path rdfs:label ],
+        [ sh:name "has participating organization"@en ;
+            sh:order 5 ;
+            sh:path m4i:projectParticipant ;
+            sh:qualifiedValueShape <https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/> ],
+        [ sh:datatype xsd:date ;
+            sh:maxCount 1 ;
+            sh:name "has start date"@en ;
+            sh:order 6 ;
+            sh:path m4i:startOfProject ],
+        [ sh:name "has participating person"@en ;
+            sh:order 4 ;
+            sh:path m4i:projectParticipant ;
+            sh:qualifiedValueShape <https://w3id.org/nfdi4ing/profiles/e18a558c-03a2-4a89-9cfb-656aad6f6644/1767883664018/> ],
+        [ dash:singleLine false ;
+            sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:name "description"@en ;
+            sh:order 2 ;
+            sh:path schema1:description ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "has project ID"@en ;
+            sh:order 3 ;
+            sh:path m4i:projectReferenceID ] ;
+    sh:targetClass schema:ResearchProject .
+
+prov:Organization rdfs:subClassOf prov:Agent .
+
+prov:Person rdfs:subClassOf prov:Agent .
+
+<https://w3id.org/nfdi4ing/profiles/e18a558c-03a2-4a89-9cfb-656aad6f6644/1767883664018/> a sh:NodeShape ;
+    dcterms:created "2025-10-08"^^xsd:date ;
+    dcterms:creator "Metadata4Ing" ;
+    dcterms:description "Ein menschliches Wesen."@de,
+        "A human being."@en ;
+    dcterms:license <http://spdx.org/licenses/CC0-1.0> ;
+    dcterms:title "m4i Person"@de,
+        "m4i Person"@en ;
+    prov:wasRevisionOf <https://w3id.org/nfdi4ing/profiles/e18a558c-03a2-4a89-9cfb-656aad6f6644/> ;
+    sh:closed false ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:name "ORCID-ID"@de,
+                "ORCID ID"@en ;
+            sh:order 2 ;
+            sh:path m4i:orcidId ],
+        [ sh:name "Zugehörigkeit"@de,
+                "Affiliation"@en ;
+            sh:node <https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/> ;
+            sh:order 3 ;
+            sh:path schema1:affiliation ],
+        [ sh:datatype xsd:string ;
+            sh:minCount 1 ;
+            sh:name "Vorname"@de,
+                "First Name"@en ;
+            sh:order 0 ;
+            sh:path foaf:firstName ],
+        [ sh:datatype xsd:string ;
+            sh:minCount 1 ;
+            sh:name "Nachname"@de,
+                "Last Name"@en ;
+            sh:order 1 ;
+            sh:path foaf:lastName ] ;
+    sh:targetClass prov:Person .
+
+<https://w3id.org/nfdi4ing/profiles/b836ad06-e1d0-4287-a182-66de74e98eee/> a sh:NodeShape ;
+    dcterms:created "2025-10-08"^^xsd:date ;
+    dcterms:creator "Metadata4Ing" ;
+    dcterms:description "a social or legal institution such as a company, society, etc."@en ;
+    dcterms:license <http://spdx.org/licenses/CC0-1.0> ;
+    dcterms:title "m4i Organisation"@de,
+        "m4i Organization"@en ;
+    sh:closed false ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:name "ROR-ID"@de,
+                "ROR ID"@en ;
+            sh:order 2 ;
+            sh:path m4i:hasRorId ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:name "Name"@de,
+                "Name"@en ;
+            sh:order 1 ;
+            sh:path rdfs:label ] ;
+    sh:targetClass prov:Organization .
 

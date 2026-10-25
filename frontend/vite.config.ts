@@ -8,7 +8,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
-      proxy: { '/api': env.FAIR_HDF5_API_TARGET || `http://127.0.0.1:${env.FAIR_HDF5_PORT || '8000'}` },
+      proxy: {
+        '/api': env.FAIR_HDF5_API_TARGET || `http://127.0.0.1:${env.FAIR_HDF5_PORT || '8000'}`,
+      },
     },
     build: { outDir: 'dist', emptyOutDir: true },
   };
