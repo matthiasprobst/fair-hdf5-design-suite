@@ -1,37 +1,18 @@
 import { parseCapabilities } from '../editor/limits';
-import type { Blueprint, ProfileDocument, TemplateDraft } from '../types';
-import {
-  parseCatalog,
-  parsePreview,
-  parseProfileAnalysis,
-  parseTemplate,
-  parseValidation,
-} from './contracts';
-import { isRecord } from './validation';
+import type { Blueprint, ProfileDocument } from '../types';
+import { parseCatalog, parsePreview, parseProfileAnalysis, parseValidation } from './contracts';
+import { request } from './http';
 
-async function checked(response: Response): Promise<Response> {
-  if (response.ok) return response;
-  let message = `Request failed (HTTP ${response.status})`;
-  try {
-    const body: unknown = await response.json();
-    if (isRecord(body) && typeof body.detail === 'string') message = body.detail;
-  } catch {
-    /* Keep the status when the response has no JSON body. */
-  }
-  throw new Error(message);
-}
 async function getJson(url: string, signal?: AbortSignal): Promise<unknown> {
-  return (await checked(await fetch(url, { signal }))).json();
+  return (await request(url, { signal })).json();
 }
 async function post(url: string, body: unknown, signal?: AbortSignal): Promise<Response> {
-  return checked(
-    await fetch(url, {
-      signal,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-  );
+  return request(url, {
+    signal,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 async function postJson<T>(
   url: string,
@@ -49,13 +30,6 @@ export const api = {
     signal?: AbortSignal,
   ) =>
     postJson('/api/catalog/analyze', { ttl, documents, source_uri }, parseProfileAnalysis, signal),
-  saveTemplate: (template: TemplateDraft, id?: string, revision?: number, signal?: AbortSignal) =>
-    postJson(
-      id ? `/api/catalog/${encodeURIComponent(id)}/revisions` : '/api/catalog',
-      id ? { expected_revision: revision, template } : template,
-      parseTemplate,
-      signal,
-    ),
   capabilities: async (signal?: AbortSignal) =>
     parseCapabilities(await getJson('/api/capabilities', signal)),
   catalog: async (signal?: AbortSignal) => parseCatalog(await getJson('/api/catalog', signal)),
@@ -74,9 +48,7 @@ export const api = {
     body.append('design_json', JSON.stringify(design));
     body.append('file', file);
     return parseValidation(
-      await (
-        await checked(await fetch('/api/validate/file', { signal, method: 'POST', body }))
-      ).json(),
+      await (await request('/api/validate/file', { signal, method: 'POST', body })).json(),
     );
   },
 };

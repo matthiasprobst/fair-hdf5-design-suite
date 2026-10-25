@@ -28,6 +28,14 @@ Python integrations import `fair_hdf5.catalog` for catalog/demo data and
 
 - `application` creates the FastAPI app and wires shared dependencies; `api` owns HTTP transport.
 - `services.DesignService` coordinates preview, export, and validation.
+- `account_service` owns local authentication, sessions and administrator use cases;
+  `access.Principal` keeps project policy independent of the login mechanism.
+- `project_service` owns project/membership/lease policy; `project_catalog` composes
+  private project templates with the read-only installation catalog.
+- `database` owns SQLite connections and versioned SQL migrations. Rights, leases
+  and revisions are checked in the same short write transaction.
+- `project_blueprint` validates editable storage envelopes; incomplete scientific
+  designs remain saveable independently of `domain` validation.
 - `services.CatalogService` coordinates profile analysis and template publication. Both HTTP and Python callers use these services for application behavior.
 - `domain` parses blueprint envelopes and checks scientific/storage constraints; `templates` normalizes portable snapshots and derives related profiles. Neither imports the file repository.
 - `repositories` defines the storage protocol; `library` implements immutable file storage, caching, locking, and atomic revision checks.

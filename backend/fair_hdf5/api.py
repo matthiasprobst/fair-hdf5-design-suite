@@ -4,15 +4,26 @@ import json
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import Response as CookieResponse
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from .access import Principal, fail
 from .catalog import demo
 from .domain import BlueprintInput
 from .errors import DesignError
 from .services import CatalogService, DesignService
 
-router = APIRouter(prefix="/api")
+
+def get_principal(request: Request) -> Principal:
+    return request.app.state.account_service.principal(
+        request.cookies.get("fair_session"), allow_password_change=False
+    )
+
+
+Identity = Annotated[Principal, Depends(get_principal)]
+router = APIRouter(prefix="/api", dependencies=[Depends(get_principal)])
+auth_router = APIRouter(prefix="/api/auth")
 
 
 def get_service(request: Request) -> DesignService:
@@ -54,7 +65,7 @@ def analyze_profile(body: ProfileImport, service: Catalog):
 
 @router.post("/catalog", status_code=201)
 def create_template(body: dict[str, Any], service: Catalog):
-    return service.publish(body)
+    fail(403, "global_template_read_only", "Create templates inside a project.")
 
 
 class TemplateRevision(BaseModel):
@@ -64,7 +75,9 @@ class TemplateRevision(BaseModel):
 
 @router.post("/catalog/{identifier}/revisions", status_code=201)
 def publish_revision(identifier: str, body: TemplateRevision, service: Catalog):
-    return service.publish(body.template, identifier, body.expected_revision)
+    fail(
+        403, "global_template_read_only", "Shared templates are read-only. Copy one into a project."
+    )
 
 
 @router.get("/catalog/{identifier}/revisions/{revision}")
@@ -120,3 +133,245 @@ def validate_file(service: Service, design_json: str = Form(...), file: UploadFi
         return service.validate_upload(blueprint, file.file)
     finally:
         file.file.close()
+
+
+def set_session_cookie(request: Request, response: CookieResponse, token: str):
+    response.set_cookie(
+        "fair_session",
+        token,
+        httponly=True,
+        secure=request.app.state.settings.cookie_secure,
+        samesite="lax",
+        max_age=request.app.state.settings.session_seconds,
+        path="/",
+    )
+    response.headers["Cache-Control"] = "no-store"
+
+
+@auth_router.get("/session")
+def session(request: Request, response: CookieResponse):
+    token, data = request.app.state.account_service.session(request.cookies.get("fair_session"))
+    set_session_cookie(request, response, token)
+    return data
+
+
+class LoginInput(BaseModel):
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=128)
+
+
+@auth_router.post("/login")
+def login(body: LoginInput, request: Request, response: CookieResponse):
+    token, data = request.app.state.account_service.login(
+        body.username,
+        body.password,
+        request.client.host if request.client else "unknown",
+        request.cookies.get("fair_session"),
+    )
+    set_session_cookie(request, response, token)
+    return data
+
+
+@auth_router.post("/logout")
+def logout(request: Request, response: CookieResponse):
+    accounts = request.app.state.account_service
+    accounts.logout(accounts.principal(request.cookies.get("fair_session")))
+    response.delete_cookie("fair_session", path="/")
+    return {"signed_out": True}
+
+
+class PasswordInput(BaseModel):
+    old_password: str = Field(max_length=128)
+    new_password: str = Field(max_length=128)
+
+
+@auth_router.post("/password")
+def change_password(body: PasswordInput, request: Request, response: CookieResponse):
+    accounts = request.app.state.account_service
+    token, data = accounts.change_password(
+        accounts.principal(request.cookies.get("fair_session")),
+        body.old_password,
+        body.new_password,
+    )
+    set_session_cookie(request, response, token)
+    return data
+
+
+class CreateUserInput(BaseModel):
+    username: str
+    display_name: str
+    is_admin: bool = False
+
+
+@router.get("/admin/users")
+def users(request: Request, principal: Identity):
+    return request.app.state.account_service.list_users(principal)
+
+
+@router.post("/admin/users", status_code=201)
+def create_user(body: CreateUserInput, request: Request, principal: Identity):
+    accounts = request.app.state.account_service
+    temporary = accounts.temporary_password()
+    identifier = accounts.create_user(
+        body.username, body.display_name, temporary, is_admin=body.is_admin, principal=principal
+    )
+    return {"id": identifier, "temporary_password": temporary}
+
+
+class ActiveInput(BaseModel):
+    active: bool
+
+
+@router.patch("/admin/users/{identifier}")
+def activate_user(identifier: str, body: ActiveInput, request: Request, principal: Identity):
+    request.app.state.account_service.set_active(principal, identifier, body.active)
+    return {"active": body.active}
+
+
+@router.post("/admin/users/{identifier}/password")
+def reset_password(identifier: str, request: Request, principal: Identity):
+    return {
+        "temporary_password": request.app.state.account_service.reset_password(
+            principal, identifier
+        )
+    }
+
+
+class CreateProjectInput(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=3000)
+    blueprint: dict[str, Any] | None = None
+    source_id: str | None = None
+    import_key: str | None = Field(default=None, max_length=100)
+
+
+@router.get("/projects")
+def projects(request: Request, principal: Identity):
+    return request.app.state.project_service.list(principal)
+
+
+@router.post("/projects", status_code=201)
+def create_project(body: CreateProjectInput, request: Request, principal: Identity):
+    return request.app.state.project_service.create(principal, **body.model_dump())
+
+
+@router.get("/projects/{identifier}")
+def project(identifier: str, request: Request, principal: Identity):
+    return request.app.state.project_service.get(principal, identifier)
+
+
+class SaveProjectInput(BaseModel):
+    blueprint: dict[str, Any]
+    description: str = Field(default="", max_length=3000)
+    expected_revision: int = Field(ge=1)
+
+
+@router.put("/projects/{identifier}")
+def save_project(identifier: str, body: SaveProjectInput, request: Request, principal: Identity):
+    return request.app.state.project_service.save(
+        principal,
+        identifier,
+        request.headers.get("X-Edit-Lease"),
+        body.expected_revision,
+        body.blueprint,
+        body.description,
+    )
+
+
+@router.delete("/projects/{identifier}")
+def delete_project(identifier: str, request: Request, principal: Identity):
+    request.app.state.project_service.delete(principal, identifier)
+    return {"deleted": True}
+
+
+class AcquireLockInput(BaseModel):
+    editor_id: str = Field(min_length=1, max_length=100)
+
+
+@router.get("/projects/{identifier}/edit-lock")
+def edit_lock(identifier: str, request: Request, principal: Identity):
+    return request.app.state.project_service.lock(principal, identifier, "status")
+
+
+@router.post("/projects/{identifier}/edit-lock")
+def acquire_lock(identifier: str, body: AcquireLockInput, request: Request, principal: Identity):
+    return request.app.state.project_service.lock(
+        principal, identifier, "acquire", editor_id=body.editor_id
+    )
+
+
+@router.post("/projects/{identifier}/edit-lock/renew")
+def renew_lock(identifier: str, request: Request, principal: Identity):
+    return request.app.state.project_service.lock(
+        principal, identifier, "renew", request.headers.get("X-Edit-Lease")
+    )
+
+
+@router.delete("/projects/{identifier}/edit-lock")
+def release_lock(identifier: str, request: Request, principal: Identity):
+    return request.app.state.project_service.lock(
+        principal, identifier, "release", request.headers.get("X-Edit-Lease")
+    )
+
+
+@router.get("/projects/{identifier}/members")
+def project_members(identifier: str, request: Request, principal: Identity):
+    return request.app.state.project_service.members(principal, identifier)
+
+
+class MemberInput(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    role: Literal["editor", "viewer"] | None
+
+
+@router.put("/projects/{identifier}/members")
+def change_member(identifier: str, body: MemberInput, request: Request, principal: Identity):
+    return request.app.state.project_service.change_member(
+        principal, identifier, body.username, body.role
+    )
+
+
+def scoped_catalog(request, principal, identifier, revision=None):
+    return request.app.state.project_service.catalog_service(
+        principal, identifier, request.headers.get("X-Edit-Lease"), revision
+    )
+
+
+@router.get("/projects/{identifier}/catalog")
+def project_catalog(identifier: str, request: Request, principal: Identity):
+    return scoped_catalog(request, principal, identifier).catalog()
+
+
+class ProjectTemplateInput(BaseModel):
+    template: dict[str, Any]
+    expected_revision: int = Field(ge=1)
+    expected_template_revision: int | None = None
+
+
+@router.post("/projects/{identifier}/catalog", status_code=201)
+def create_project_template(
+    identifier: str, body: ProjectTemplateInput, request: Request, principal: Identity
+):
+    return scoped_catalog(request, principal, identifier, body.expected_revision).publish(
+        body.template
+    )
+
+
+@router.post("/projects/{identifier}/catalog/{template_id}/revisions", status_code=201)
+def revise_project_template(
+    identifier: str,
+    template_id: str,
+    body: ProjectTemplateInput,
+    request: Request,
+    principal: Identity,
+):
+    return scoped_catalog(request, principal, identifier, body.expected_revision).publish(
+        body.template, template_id, body.expected_template_revision
+    )
+
+
+@router.get("/projects/{identifier}/catalog/{template_id}/revisions/{revision}")
+def project_template_revision(
+    identifier: str, template_id: str, revision: int, request: Request, principal: Identity
+):
+    return scoped_catalog(request, principal, identifier).get_revision(template_id, revision)

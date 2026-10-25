@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { buildTemplateDraft } from './draft';
 import type { CatalogItem, ProfileDocument, ProfileField, ProfileAnalysis } from '../types';
 import { api } from '../lib/api';
-import { editorStore } from '../editor/store';
+import { useEditorStore } from '../editor/context';
+import { useProjectSession } from '../projects/EditorSessionContext';
 
 export function useLibraryEditor(template: CatalogItem | undefined, onClose: () => void) {
+  const editorStore = useEditorStore();
+  const session = useProjectSession();
   const [mode, setMode] = useState<'form' | 'turtle'>(template ? 'turtle' : 'form');
   const [label, setLabel] = useState(template?.label || '');
   const [category, setCategory] = useState(template?.category || 'Metadata');
@@ -105,10 +108,10 @@ export function useLibraryEditor(template: CatalogItem | undefined, onClose: () 
         },
         template,
       );
-      const saved = await api.saveTemplate(
+      const saved = await session.publish(
         draft,
-        template?.id,
-        template?.revision,
+        template?.project_local ? template.id : undefined,
+        template?.project_local ? template.revision : undefined,
         controller.signal,
       );
       if (controller.signal.aborted) return;

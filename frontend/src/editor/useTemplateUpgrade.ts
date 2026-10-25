@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { CatalogItem } from '../types';
-import { editorStore } from './store';
-import { artifacts } from './lifecycle';
+import { useEditorStore } from './context';
+import { useProjectSession } from '../projects/EditorSessionContext';
 import { errorMessage } from '../lib/validation';
 
 export function useTemplateUpgrade(onNotice: (message: string, error?: boolean) => void) {
+  const editorStore = useEditorStore();
+  const { artifacts } = useProjectSession();
   const [busy, setBusy] = useState(false);
   const apply = async (nodeId: string, template: CatalogItem) => {
     setBusy(true);

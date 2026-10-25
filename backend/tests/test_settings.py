@@ -12,6 +12,23 @@ from support import CatalogTestCase
 
 
 class SettingsTests(CatalogTestCase):
+    def test_project_auth_settings_validate_origins_and_lock_timing(self):
+        self.assertIsNone(Settings(_env_file=None, public_url="").public_url)
+        self.assertEqual(
+            Settings(_env_file=None, public_url="https://design.example.org/").public_url,
+            "https://design.example.org",
+        )
+        for origin in (
+            "https://design.example.org/path",
+            "https://user:password@example.org",
+            "file:///tmp/app",
+            "https://example.org?query=yes",
+        ):
+            with self.subTest(origin=origin), self.assertRaises(ValueError):
+                Settings(_env_file=None, public_url=origin)
+        with self.assertRaises(ValueError):
+            Settings(_env_file=None, edit_lock_seconds=30)
+
     def setUp(self):
         super().setUp()
         self.environment = patch.dict(
@@ -23,6 +40,7 @@ class SettingsTests(CatalogTestCase):
     def test_defaults_and_public_capabilities(self):
         settings = Settings(_env_file=None)
         self.assertEqual(settings.port, 8000)
+        self.assertEqual(settings.password_min_length, 15)
         self.assertEqual(settings.shacl_engine, "pyshacl")
         self.assertEqual(settings.max_dataset_elements, 2_000_000)
         self.assertEqual(
@@ -50,6 +68,8 @@ class SettingsTests(CatalogTestCase):
         for overrides in (
             {"port": 0},
             {"port": 65536},
+            {"password_min_length": 2},
+            {"password_min_length": 129},
             {"max_nodes": 0},
             {"max_upload_bytes": -1},
             {"shacl_engine": "automatic"},
@@ -59,6 +79,14 @@ class SettingsTests(CatalogTestCase):
         ):
             with self.subTest(overrides=overrides), self.assertRaises(ValidationError):
                 Settings(_env_file=None, **overrides)
+
+    def test_password_minimum_can_be_configured_from_environment(self):
+        for minimum in (3, 128):
+            with (
+                self.subTest(minimum=minimum),
+                patch.dict(os.environ, {"FAIR_HDF5_PASSWORD_MIN_LENGTH": str(minimum)}),
+            ):
+                self.assertEqual(Settings(_env_file=None).password_min_length, minimum)
 
     def test_paths_resolve_from_project_not_cwd(self):
         settings = Settings(_env_file=None, frontend_dist="frontend/custom")

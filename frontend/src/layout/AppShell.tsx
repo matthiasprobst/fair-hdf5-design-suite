@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bell, ChevronDown, Menu, Search } from 'lucide-react';
+import { ChevronDown, Menu, LogOut, UserRound, Settings } from 'lucide-react';
+import type { User } from '../projects/types';
 import '../styles/shell.css';
 
 export type NavigationDestination = 'projects' | 'templates' | 'profile' | 'about';
@@ -8,6 +9,11 @@ export type NavigationDestination = 'projects' | 'templates' | 'profile' | 'abou
 type HeaderProps = {
   onNavigate: (destination: NavigationDestination) => void;
   onValidate: () => void;
+  user: User;
+  inProject: boolean;
+  onAccount: () => void;
+  onLogout: () => void;
+  onAdmin: () => void;
 };
 
 /** Shared viewport shell; feature views own their content and data providers. */
@@ -20,7 +26,15 @@ export function AppShell({ header, children }: { header: ReactNode; children: Re
   );
 }
 
-export function GlobalHeader({ onNavigate, onValidate }: HeaderProps) {
+export function GlobalHeader({
+  onNavigate,
+  onValidate,
+  user,
+  inProject,
+  onAccount,
+  onLogout,
+  onAdmin,
+}: HeaderProps) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   return (
@@ -59,27 +73,46 @@ export function GlobalHeader({ onNavigate, onValidate }: HeaderProps) {
         aria-label="Application navigation"
         onClick={() => setNavigationOpen(false)}
       >
-        <button onClick={() => onNavigate('projects')}>Projects</button>
-        <button onClick={() => onNavigate('templates')}>Templates</button>
-        <button onClick={() => onNavigate('profile')}>Metadata Profiles (MPS)</button>
-        <button onClick={() => onValidate()}>Validation</button>
-        <button onClick={() => onNavigate('about')}>
+        <button
+          aria-current={!inProject ? 'page' : undefined}
+          onClick={() => onNavigate('projects')}
+        >
+          Projects
+        </button>
+        <button disabled={!inProject} onClick={() => onNavigate('templates')}>
+          Templates
+        </button>
+        <button disabled={!inProject} onClick={() => onNavigate('profile')}>
+          Metadata Profiles (MPS)
+        </button>
+        <button disabled={!inProject} onClick={() => onValidate()}>
+          Validation
+        </button>
+        <button disabled={!inProject} onClick={() => onNavigate('about')}>
           Help <ChevronDown size={13} />
         </button>
       </nav>
       <div className="global-right">
-        <div className="global-search">
-          <Search size={17} />
-          <span>Search projects, blocks, profiles...</span>
-          <kbd>⌘ K</kbd>
+        <div className="user-avatar" aria-hidden="true">
+          {user.display_name
+            .split(/\s+/)
+            .map((part) => part[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase()}
         </div>
-        <button className="top-icon" onClick={() => onNavigate('about')} aria-label="Notifications">
-          <Bell size={19} />
-          <span />
+        <span className="user-name">{user.display_name}</span>
+        {user.is_admin && (
+          <button className="top-icon" onClick={onAdmin} aria-label="Administration">
+            <Settings size={18} />
+          </button>
+        )}
+        <button className="top-icon" onClick={onAccount} aria-label="Your account">
+          <UserRound size={18} />
         </button>
-        <div className="user-avatar">JD</div>
-        <span className="user-name">Researcher</span>
-        <ChevronDown size={13} color="#748097" />
+        <button className="top-icon" onClick={onLogout} aria-label="Sign out">
+          <LogOut size={18} />
+        </button>
       </div>
     </header>
   );

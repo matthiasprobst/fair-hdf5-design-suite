@@ -12,15 +12,7 @@ import {
 } from 'lucide-react';
 import type { Preview, ValidationResult } from '../types';
 export type Dialog =
-  | 'structure'
-  | 'shacl'
-  | 'validation'
-  | 'about'
-  | 'templates'
-  | 'projects'
-  | 'share'
-  | 'profile'
-  | null;
+  'structure' | 'shacl' | 'validation' | 'about' | 'templates' | 'profile' | null;
 type Props = {
   dialog: Dialog;
   onClose: () => void;
@@ -54,8 +46,6 @@ export default function Modal({
     validation: 'Validation report',
     about: 'About the FAIR Data Design Suite',
     templates: 'Reusable building blocks',
-    projects: 'Current project',
-    share: 'Share your experiment blueprint',
     profile: 'Metadata Profile Service',
   };
   const pathTree = preview?.objects || [];
@@ -222,29 +212,6 @@ export default function Modal({
               <p>
                 Use Create / import template in the library to create a persistent template or
                 import SHACL Turtle. Existing nodes keep their saved revision.
-              </p>
-            </>
-          )}
-          {dialog === 'projects' && (
-            <>
-              <p>
-                Active project: <strong>{name}</strong>
-              </p>
-              <p>
-                Your current blueprint is automatically saved in this browser. Download it as JSON
-                to transfer it to another computer or preserve a version.
-              </p>
-            </>
-          )}
-          {dialog === 'share' && (
-            <>
-              <p>
-                To share a reproducible design, export the <strong>Blueprint JSON</strong> from the
-                project menu or export SHACL and an HDF5 template.
-              </p>
-              <p>
-                Multiuser collaboration and cloud sharing are not implemented in this local proof of
-                concept.
               </p>
             </>
           )}

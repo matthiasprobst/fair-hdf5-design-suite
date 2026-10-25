@@ -25,6 +25,8 @@ def validate_snapshot(
     settings = settings or Settings()
     info = deepcopy(raw)
     info.pop("initial", None)
+    info.pop("project_local", None)
+    info.pop("project_revision", None)
     if not isinstance(info.get("id"), str) or not ID_RE.fullmatch(info["id"]):
         raise DesignError("Invalid template ID.")
     if type(info.get("revision")) is not int or info["revision"] < 1:

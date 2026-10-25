@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,6 +43,30 @@ class Settings(BaseSettings):
     max_dimension_size: int = Field(default=50_000, gt=0)
     max_dataset_elements: int = Field(default=2_000_000, gt=0)
     max_report_issues: int = Field(default=250, gt=0)
+    max_blueprint_bytes: int = Field(default=32 * 1024 * 1024, gt=0)
+    session_seconds: int = Field(default=12 * 60 * 60, ge=60)
+    password_min_length: int = Field(default=15, ge=3, le=128)
+    edit_lock_seconds: int = Field(default=120, ge=60)
+    cookie_secure: bool = False
+    public_url: str | None = None
+
+    @field_validator("public_url", mode="before")
+    @classmethod
+    def validate_public_url(cls, value):
+        if value in (None, ""):
+            return None
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("Public URL must be an HTTP(S) origin without a path or credentials.")
+        return value.rstrip("/")
 
     @field_validator("frontend_dist", "temp_dir", "data_dir", mode="before")
     @classmethod

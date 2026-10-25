@@ -2,6 +2,7 @@ import { isTemplateSnapshot } from '../lib/validation';
 import type { Capabilities } from './limits';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
+import { useEditorStore } from './context';
 import { applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
 import type { Connection, EdgeChange, NodeChange } from '@xyflow/react';
 import type {
@@ -31,6 +32,7 @@ export interface EditorState extends Graph {
   saveRevision: number;
   graphRevision: number;
   replace: (blueprint: Blueprint, catalog?: Catalog) => void;
+  hydrate: (blueprint: Blueprint, catalog?: Catalog) => void;
   rename: (name: string) => void;
   onNodesChange: (changes: NodeChange<ScientificFlowNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ScientificFlowEdge>[]) => void;
@@ -62,8 +64,8 @@ function remove(s: Pick<Graph, 'nodes' | 'edges'>, nodeIds: string[], edgeIds: s
     : s.edges;
   return { nodes, edges };
 }
-export function createEditorStore() {
-  return createStore<EditorState>((set, get) => ({
+export function createEditorStore(canMutate: () => boolean = () => true) {
+  const store = createStore<EditorState>((set, get) => ({
     name: '',
     version: '0.1',
     nodes: [],
@@ -184,7 +186,7 @@ export function createEditorStore() {
         };
       }),
     setCapabilities: (capabilities) => set({ capabilities }),
-    replace: (blueprint, catalog) =>
+    hydrate: (blueprint, catalog) =>
       set((s) => ({
         ...fromBlueprint(blueprint),
         catalog: catalog ?? s.catalog,
@@ -192,6 +194,7 @@ export function createEditorStore() {
         graphRevision: s.graphRevision + 1,
         ...changed(s),
       })),
+    replace: (blueprint, catalog) => get().hydrate(blueprint, catalog),
     rename: (name) => set((s) => (name === s.name ? s : { name, ...changed(s) })),
     onNodesChange: (changes) =>
       set((s) => {
@@ -358,9 +361,38 @@ export function createEditorStore() {
       });
     },
   }));
+  const actions = store.getState();
+  const guard =
+    <A extends unknown[]>(action: (...args: A) => void) =>
+    (...args: A) => {
+      if (canMutate()) action(...args);
+    };
+  store.setState({
+    replace: guard(actions.replace),
+    rename: guard(actions.rename),
+    addNode: guard(actions.addNode),
+    duplicateNode: guard(actions.duplicateNode),
+    updateNode: guard(actions.updateNode),
+    updateEdge: guard(actions.updateEdge),
+    connect: guard(actions.connect),
+    deleteElements: guard(actions.deleteElements),
+    linkNode: guard(actions.linkNode),
+    createLinkedNode: guard(actions.createLinkedNode),
+    upgradeNode: guard(actions.upgradeNode),
+    publishTemplate: guard(actions.publishTemplate),
+    isValidConnection: (connection) => canMutate() && actions.isValidConnection(connection),
+    onNodesChange: (changes) =>
+      actions.onNodesChange(
+        canMutate()
+          ? changes
+          : changes.filter((c) => c.type === 'select' || c.type === 'dimensions'),
+      ),
+    onEdgesChange: (changes) =>
+      actions.onEdgesChange(canMutate() ? changes : changes.filter((c) => c.type === 'select')),
+  });
+  return store;
 }
 export type EditorStore = ReturnType<typeof createEditorStore>;
-export const editorStore = createEditorStore();
 export function useEditor<T>(selector: (state: EditorState) => T): T {
-  return useStore(editorStore, selector);
+  return useStore(useEditorStore(), selector);
 }

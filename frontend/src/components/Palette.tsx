@@ -12,6 +12,7 @@ import {
 import type { Catalog, NodeType } from '../types';
 import LibraryEditor from './LibraryEditor';
 import { CATEGORY_ICONS, ICONS } from '../lib/ui';
+import { useCanEdit } from '../projects/EditorSessionContext';
 
 const order = ['Experiment', 'Sensor', 'Equipment', 'Process', 'HDF5 structure', 'Metadata'];
 const descriptions: Record<string, string> = {
@@ -28,6 +29,7 @@ interface Props {
   onClose?: () => void;
 }
 export default function Palette({ catalog, onAdd, onClose }: Props) {
+  const canEdit = useCanEdit();
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<string[]>([]);
@@ -62,7 +64,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
           <Shapes size={17} color="#71819d" />
         )}
       </div>
-      <button className="library-create" onClick={() => setEditing(null)}>
+      <button className="library-create" disabled={!canEdit} onClick={() => setEditing(null)}>
         <Plus size={15} /> Create / import template
       </button>
       {editing !== undefined && (
@@ -112,7 +114,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                     <div
                       key={type}
                       className="palette-item"
-                      draggable
+                      draggable={canEdit}
                       title="Drag onto the canvas or click + to add"
                       onDragStart={(event) => {
                         event.dataTransfer.setData('application/x-fair-component', type);
@@ -129,7 +131,8 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                       </div>
                       <button
                         className="icon-button"
-                        aria-label={`Edit template ${info.label}`}
+                        disabled={!canEdit}
+                        aria-label={`${info.project_local ? 'Edit template' : 'Copy template'} ${info.label}`}
                         onClick={() => setEditing(type)}
                       >
                         ✎
@@ -137,6 +140,7 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                       <GripVertical className="palette-grip" size={13} />
                       <button
                         className="palette-add"
+                        disabled={!canEdit}
                         aria-label={`Add ${info.label}`}
                         onClick={() => onAdd(type as NodeType)}
                       >

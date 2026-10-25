@@ -10,10 +10,10 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import { ScientificNode } from './ScientificNode';
-import { editorStore, useEditor } from '../editor/store';
+import { useEditor } from '../editor/store';
+import { useEditorStore } from '../editor/context';
+import { useCanEdit } from '../projects/EditorSessionContext';
 import type { ScientificFlowEdge, ScientificFlowNode } from '../editor/adapters';
-import { toBlueprint } from '../editor/adapters';
-import { jsonFile } from '../lib/downloads';
 import { COLORS } from '../lib/ui';
 const nodeTypes = { scientific: ScientificNode };
 const edgeDefaults = { type: 'smoothstep' };
@@ -50,6 +50,8 @@ export function Canvas({
   showMinimap: boolean;
   onSelection: () => void;
 }) {
+  const editorStore = useEditorStore();
+  const canEdit = useCanEdit();
   const nodes = useEditor((s) => s.nodes),
     edges = useEditor((s) => s.edges);
   const revision = useEditor((s) => s.graphRevision);
@@ -68,10 +70,10 @@ export function Canvas({
       onEdgeClick={onSelection}
       defaultEdgeOptions={edgeDefaults}
       connectionLineStyle={lineStyle}
-      deleteKeyCode={deleteKeys}
+      deleteKeyCode={canEdit ? deleteKeys : null}
       selectionOnDrag={false}
-      nodesDraggable
-      nodesConnectable
+      nodesDraggable={canEdit}
+      nodesConnectable={canEdit}
       elementsSelectable
       minZoom={0.05}
       maxZoom={1.7}
@@ -100,7 +102,10 @@ export function Canvas({
     </ReactFlow>
   );
 }
-export class CanvasErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+export class CanvasErrorBoundary extends Component<
+  { children: ReactNode; onExport: () => void },
+  { failed: boolean }
+> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
@@ -111,13 +116,7 @@ export class CanvasErrorBoundary extends Component<{ children: ReactNode }, { fa
         <div className="api-error" role="alert">
           <h2>Canvas could not be displayed</h2>
           <p>Your blueprint is still available for recovery.</p>
-          <button
-            onClick={() =>
-              jsonFile(toBlueprint(editorStore.getState()), 'recovered-blueprint.json')
-            }
-          >
-            Export recovery blueprint
-          </button>
+          <button onClick={this.props.onExport}>Export recovery blueprint</button>
           <button onClick={() => this.setState({ failed: false })}>Retry canvas</button>
         </div>
       );

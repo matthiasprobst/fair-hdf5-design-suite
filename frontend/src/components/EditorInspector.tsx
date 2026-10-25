@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import Inspector from './Inspector';
 import { EditorReferenceFields } from './EditorReferenceFields';
 import { useTemplateUpgrade } from '../editor/useTemplateUpgrade';
-import { editorStore, useEditor } from '../editor/store';
+import { useEditor } from '../editor/store';
+import { useEditorStore } from '../editor/context';
 import { toEdge, toNode } from '../editor/adapters';
-const deleteNode = (id: string) => editorStore.getState().deleteElements([id]);
-const deleteEdge = (id: string) => editorStore.getState().deleteElements([], [id]);
+import { useCanEdit } from '../projects/EditorSessionContext';
 export function EditorInspector({
   onClose,
   onNotice,
@@ -13,6 +13,8 @@ export function EditorInspector({
   onClose: () => void;
   onNotice: (text: string, error?: boolean) => void;
 }) {
+  const editorStore = useEditorStore();
+  const canEdit = useCanEdit();
   const upgrade = useTemplateUpgrade(onNotice);
   const selectedNode = useEditor((s) => s.nodes.find((n) => n.selected));
   const selectedEdge = useEditor((s) => s.edges.find((e) => e.selected));
@@ -22,6 +24,7 @@ export function EditorInspector({
   const actions = editorStore.getState();
   return (
     <Inspector
+      readOnly={!canEdit}
       referenceFields={node ? <EditorReferenceFields node={node} onNotice={onNotice} /> : null}
       onUpgrade={upgrade.apply}
       upgrading={upgrade.busy}
@@ -30,10 +33,10 @@ export function EditorInspector({
       edge={edge}
       catalog={catalog}
       onUpdate={actions.updateNode}
-      onDelete={deleteNode}
+      onDelete={(id) => actions.deleteElements([id])}
       onDuplicate={actions.duplicateNode}
       onEdgeChange={actions.updateEdge}
-      onDeleteEdge={deleteEdge}
+      onDeleteEdge={(id) => actions.deleteElements([], [id])}
       onClose={onClose}
       onNotice={onNotice}
     />

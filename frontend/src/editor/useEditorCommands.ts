@@ -4,12 +4,14 @@ import type { ChangeEvent } from 'react';
 import type { Dialog } from '../components/Modal';
 import { api } from '../lib/api';
 import { download, jsonFile } from '../lib/downloads';
-import { editorStore } from './store';
+import { useEditorStore } from './context';
 import { parseBlueprint, toBlueprint } from './adapters';
-import { artifacts } from './lifecycle';
+import { useProjectSession } from '../projects/EditorSessionContext';
 
 /** Editor operations and their cancellation lifecycle, independent of panel layout. */
 export function useEditorCommands(recoveryRaw: string | null) {
+  const editorStore = useEditorStore();
+  const { artifacts } = useProjectSession();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState('');
@@ -39,7 +41,7 @@ export function useEditorCommands(recoveryRaw: string | null) {
       cancelPending();
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
     };
-  }, [cancelPending]);
+  }, [cancelPending, editorStore]);
   const execute = useCallback(
     async (label: string, fn: (signal: AbortSignal) => Promise<void>) => {
       pending.current?.abort();
@@ -128,8 +130,17 @@ export function useEditorCommands(recoveryRaw: string | null) {
     jsonFile(toBlueprint(editorStore.getState()), 'experiment-blueprint.json');
   const onLoadFile = () => importRef.current?.click();
   const exportRecovery = () => {
-    if (recoveryRaw !== null)
-      download(new Blob([recoveryRaw], { type: 'application/json' }), 'original-draft.json');
+    if (recoveryRaw !== null) {
+      let content = recoveryRaw;
+      try {
+        const value = JSON.parse(recoveryRaw);
+        if (value && typeof value === 'object' && 'blueprint' in value)
+          content = JSON.stringify(value.blueprint, null, 2);
+      } catch {
+        /* Keep malformed originals available. */
+      }
+      download(new Blob([content], { type: 'application/json' }), 'original-draft.json');
+    }
   };
 
   return {

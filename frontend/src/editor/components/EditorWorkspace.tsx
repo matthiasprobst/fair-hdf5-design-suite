@@ -8,7 +8,10 @@ import { EditorInspector } from '../../components/EditorInspector';
 import { Canvas, CanvasErrorBoundary } from '../../components/Canvas';
 import { WorkbenchLayout } from '../../layout/WorkbenchLayout';
 import { useWorkbenchPanels } from '../../layout/useWorkbenchPanels';
-import { editorStore, useEditor } from '../store';
+import { useEditor } from '../store';
+import { useEditorStore } from '../context';
+import { jsonFile } from '../../lib/downloads';
+import { toBlueprint } from '../adapters';
 import { CanvasHeading } from './CanvasHeading';
 
 type Props = {
@@ -18,6 +21,7 @@ type Props = {
 };
 
 export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props) {
+  const editorStore = useEditorStore();
   const catalog = useEditor((state) => state.catalog);
   const panels = useWorkbenchPanels();
   const { showInspector } = panels;
@@ -36,7 +40,7 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
       editorStore.getState().addNode(type, x, y);
       showInspector();
     },
-    [onNotice, showInspector],
+    [onNotice, showInspector, editorStore],
   );
 
   const onDrop = useCallback(
@@ -88,7 +92,11 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
               event.dataTransfer.dropEffect = 'copy';
             }}
           >
-            <CanvasErrorBoundary>
+            <CanvasErrorBoundary
+              onExport={() =>
+                jsonFile(toBlueprint(editorStore.getState()), 'recovered-blueprint.json')
+              }
+            >
               <Canvas showMinimap={showMinimap} onSelection={showInspector} />
             </CanvasErrorBoundary>
             <div className="canvas-corner-note">

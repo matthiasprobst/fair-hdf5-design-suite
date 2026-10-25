@@ -43,6 +43,13 @@ jobs:
       - run: npm ci --prefix frontend
       - run: npm run check --prefix frontend
 
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build --tag fair-hdf5:ci .
+
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -51,6 +58,7 @@ jobs:
       FAIR_HDF5_PORT: 8000
       FAIR_UI_URL: http://127.0.0.1:8000
       FAIR_SCREENSHOT_DIR: ${{ runner.temp }}/fair-browser-screenshots
+      FAIR_TEST_PASSWORD: browser test passphrase only
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -70,6 +78,7 @@ jobs:
       - name: Run browser regressions against the production build
         shell: bash
         run: |
+          python tests/prepare_browser.py
           python -m fair_hdf5 > "$RUNNER_TEMP/fair-api.log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
@@ -86,6 +95,7 @@ jobs:
               raise SystemExit('API did not become ready')
           PY
           python tests/ui_playwright_editor.py
+          python tests/ui_playwright_projects.py
       - name: Upload browser evidence and server log
         if: always()
         uses: actions/upload-artifact@v7

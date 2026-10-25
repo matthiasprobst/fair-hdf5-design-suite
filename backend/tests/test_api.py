@@ -14,14 +14,14 @@ import httpx
 from fair_hdf5.application import create_app
 from fair_hdf5.settings import Settings
 from fastapi.testclient import TestClient
-from support import AsyncCatalogTestCase, CatalogTestCase
+from support import TEST_PASSWORD, AsyncCatalogTestCase, CatalogTestCase, authenticated_client
 
 
 class APITests(CatalogTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.client = TestClient(create_app(Settings(_env_file=None)))
+        cls.client = authenticated_client(TestClient(create_app(Settings(_env_file=None))))
         cls.blueprint = cls.client.get("/api/demo").json()
 
     @classmethod
@@ -88,7 +88,7 @@ class APIConfigurationTests(CatalogTestCase):
             create_app(Settings(_env_file=None, **overrides)), raise_server_exceptions=False
         )
         self.addCleanup(client.close)
-        return client
+        return authenticated_client(client)
 
     def test_capabilities_and_app_settings_are_isolated(self):
         first = self.client(max_nodes=1, max_edges=2, shacl_engine="subset")
@@ -192,6 +192,15 @@ class APIConcurrencyTests(AsyncCatalogTestCase):
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            app.state.account_service.create_user(
+                "asyncadmin", "Async admin", TEST_PASSWORD, is_admin=True, bootstrap=True
+            )
+            session = (await client.get("/api/auth/session")).json()
+            client.headers["X-CSRF-Token"] = session["csrf_token"]
+            login = await client.post(
+                "/api/auth/login", json={"username": "asyncadmin", "password": TEST_PASSWORD}
+            )
+            client.headers["X-CSRF-Token"] = login.json()["csrf_token"]
             with patch.object(
                 app.state.design_service, "validate_upload", side_effect=slow_validation
             ):

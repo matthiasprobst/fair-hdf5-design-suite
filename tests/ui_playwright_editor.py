@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from fair_hdf5.catalog import CATALOG, demo
 from playwright.sync_api import expect, sync_playwright
+from ui_support import create_project, sign_in
 
 URL = os.environ.get("FAIR_UI_URL", "http://127.0.0.1:5173")
 OUT = Path(os.environ.get("FAIR_SCREENSHOT_DIR", "/tmp/fair-editor-qa"))
@@ -68,6 +69,7 @@ class EditorBrowserTests(unittest.TestCase):
         # Exclude external font/network noise from app console assertions.
         self.context.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body=""))
         self.context.route("https://fonts.gstatic.com/**", lambda r: r.fulfill(body=""))
+        self.user, self.csrf = sign_in(self.context)
         self.page = self.context.new_page()
         self.errors = []
         self.expected_http_statuses = set()
@@ -106,17 +108,30 @@ class EditorBrowserTests(unittest.TestCase):
             self.context.unroute_all(behavior="ignoreErrors")
             self.context.close()
 
-    def load(self, blueprint=BASE, raw=None):
-        raw = json.dumps(blueprint) if raw is None else raw
-        self.page.add_init_script(f"""if (!sessionStorage.getItem('test-seeded')) {{
-            localStorage.setItem({json.dumps(KEY)}, {json.dumps(raw)});
-            sessionStorage.setItem('test-seeded','yes');
-        }}""")
-        self.page.goto(URL)
+    def prepare_project(self, blueprint=BASE):
+        self.current_project = create_project(self.context, self.csrf, blueprint)
+        self.project_url = URL + "/projects/" + self.current_project["id"]
+
+    def start_editing(self):
+        self.page.get_by_role("button", name="Edit project", exact=True).click()
+        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
+
+    def load(self, blueprint=BASE):
+        self.prepare_project(blueprint)
+        self.page.goto(self.project_url)
         expect(self.page).to_have_title("FAIR Data Design Suite")
-        self.assertTrue(self.page.url.startswith(URL))
-        expect(self.page.get_by_role("heading", name="Target HDF5 Design")).to_be_visible()
+        # The first request compiles the pinned installation catalog on a cold server.
+        expect(self.page.get_by_role("heading", name="Target HDF5 Design")).to_be_visible(
+            timeout=20000
+        )
+        self.start_editing()
         self.assertEqual(self.page.locator("vite-error-overlay").count(), 0)
+
+    def assert_base_blueprint(self):
+        actual = self.stored()
+        for node in actual["nodes"]:
+            self.assertEqual(node.pop("template")["id"], node["type"])
+        self.assertEqual(actual, BASE)
 
     def graph_visible(self, count):
         # Zero nodes also matches the loading screen; wait for the canvas first.
@@ -139,10 +154,12 @@ class EditorBrowserTests(unittest.TestCase):
         return self.page.locator(f'.react-flow__node[data-id="{id}"]')
 
     def stored(self):
-        return self.page.evaluate("(key)=>JSON.parse(localStorage.getItem(key))", KEY)
+        response = self.context.request.get(URL + "/api/projects/" + self.current_project["id"])
+        self.assertEqual(response.status, 200)
+        return response.json()["blueprint"]
 
     def wait_saved(self):
-        expect(self.page.locator(".saved-text")).to_contain_text("Saved locally")
+        expect(self.page.locator(".saved-text")).to_contain_text("Saved on server")
 
     def settled_viewport(self):
         self.page.evaluate("""() => new Promise(resolve => {
@@ -376,7 +393,7 @@ class EditorBrowserTests(unittest.TestCase):
         self.load()
         self.graph_visible(3)
         self.page.get_by_role("button", name="Create / import template").click()
-        dialog = self.page.get_by_role("dialog", name="Create library template")
+        dialog = self.page.get_by_role("dialog", name="Create project template")
         dialog.get_by_label("Template name", exact=True).fill(label)
         dialog.get_by_label("Default HDF5 path", exact=True).fill("/qa/reusable")
         dialog.get_by_role("button", name="Add field", exact=True).click()
@@ -386,7 +403,7 @@ class EditorBrowserTests(unittest.TestCase):
         field.get_by_label("Property IRI", exact=True).fill("urn:qa:title")
         field.get_by_label("Default value", exact=True).fill("Initial title")
         field.get_by_label("Required", exact=True).check()
-        dialog.get_by_role("button", name="Save to library", exact=True).click()
+        dialog.get_by_role("button", name="Save to project", exact=True).click()
         expect(dialog).to_be_hidden()
         self.page.locator(".palette-item").filter(has_text=label).hover()
         self.page.get_by_role("button", name="Add " + label, exact=True).click()
@@ -419,7 +436,7 @@ class EditorBrowserTests(unittest.TestCase):
         self.load()
         self.graph_visible(3)
         self.page.get_by_role("button", name="Create / import template").click()
-        dialog = self.page.get_by_role("dialog", name="Create library template")
+        dialog = self.page.get_by_role("dialog", name="Create project template")
         dialog.get_by_role("button", name="SHACL Turtle import", exact=True).click()
         dialog.get_by_label("Template name", exact=True).fill(label)
         dialog.get_by_label("Default HDF5 path", exact=True).fill("/qa/linked")
@@ -434,7 +451,7 @@ class EditorBrowserTests(unittest.TestCase):
         dialog.get_by_role("button", name="Analyze profile", exact=True).click()
         expect(dialog.get_by_role("radio", name="QA Project", exact=True)).to_be_enabled()
         dialog.get_by_role("radio", name="QA Project", exact=True).check()
-        dialog.get_by_role("button", name="Save to library", exact=True).click()
+        dialog.get_by_role("button", name="Save to project", exact=True).click()
         expect(dialog).to_be_hidden()
         self.page.locator(".palette-item").filter(has_text=label).hover()
         self.page.get_by_role("button", name="Add " + label, exact=True).click()
@@ -451,54 +468,47 @@ class EditorBrowserTests(unittest.TestCase):
         expect(self.page.locator(".react-flow__edge")).to_have_count(1)
 
     def test_slow_initialization_and_saved_invalid_semantics(self):
-        # Hold catalog delivery until the loading screen is observed.
-        catalog = self.page.request.get(f"{URL}/api/catalog").json()
-        held = []
-        self.page.route("**/api/catalog", lambda route: held.append(route))
         invalid = copy.deepcopy(BASE)
         invalid["nodes"][0]["config"]["path"] = ""
-        # This draft is structurally editable but fails the real backend's path check.
         self.expected_http_statuses.add(422)
-        self.page.add_init_script(
-            f"if(!sessionStorage.getItem('invalid-seeded')){{localStorage.setItem({json.dumps(KEY)},{json.dumps(json.dumps(invalid))});sessionStorage.setItem('invalid-seeded','yes')}}"
-        )
-        self.page.goto(URL, wait_until="domcontentloaded")
-        expect(self.page.get_by_text("Loading research data workspace")).to_be_visible()
-        self.page.wait_for_function('document.querySelector(".app-loading")!==null')
-        self.page.unroute("**/api/catalog")
-        # StrictMode can initiate and abort an earlier catalog request.
+        self.prepare_project(invalid)
+        catalog = self.context.request.get(
+            URL + "/api/projects/" + self.current_project["id"] + "/catalog"
+        ).json()
+        held = []
+        pattern = "**/api/projects/*/catalog"
+        self.page.route(pattern, lambda route: held.append(route))
+        self.page.goto(self.project_url, wait_until="domcontentloaded")
+        expect(self.page.get_by_text("Loading project…", exact=True)).to_be_visible()
+        self.page.unroute(pattern)
         for route in held:
             try:
-                route.fulfill(
-                    status=200,
-                    content_type="application/json",
-                    body=json.dumps(catalog),
-                )
+                route.fulfill(status=200, content_type="application/json", body=json.dumps(catalog))
             except Exception:
                 pass
         self.graph_visible(3)
-        self.assertEqual(self.stored()["nodes"][0]["config"]["path"], "")
-        self.assertEqual(self.stored()["name"], invalid["name"])
+        self.start_editing()
         expect(self.page.get_by_role("alert")).to_contain_text("invalid absolute HDF5 path")
-        self.page.reload()
-        self.graph_visible(3)
         self.assertEqual(self.stored()["nodes"][0]["config"]["path"], "")
         self.node("fan").locator(".node-title").click()
         self.page.locator(".form-field").filter(
             has=self.page.locator("label", has_text="Target path (HDF5)")
         ).locator("input").fill("/repaired")
-        expect(self.page.locator(".artifact-shacl .artifact-status")).to_contain_text("Ready")
         self.wait_saved()
+        self.assertEqual(self.stored()["nodes"][0]["config"]["path"], "/repaired")
+        self.page.reload()
+        self.graph_visible(3)
         self.assertEqual(self.stored()["nodes"][0]["config"]["path"], "/repaired")
 
     def test_unavailable_storage_still_allows_edit_and_export(self):
         self.page.add_init_script(
             "Storage.prototype.getItem = function(){throw new Error('storage denied')}; Storage.prototype.setItem = function(){throw new Error('storage denied')}"
         )
-        self.page.goto(URL)
-        expect(self.page.get_by_role("alert")).to_contain_text("storage denied")
-        expect(self.page.get_by_role("heading", name="Target HDF5 Design")).to_be_visible()
+        self.load()
         self.page.get_by_label("Experiment title").fill("Recoverable editor")
+        expect(self.page.get_by_role("alert")).to_contain_text("Local recovery is unavailable")
+        self.wait_saved()
+        self.assertEqual(self.stored()["name"], "Recoverable editor")
         self.page.get_by_role("button", name="Project", exact=True).click()
         with self.page.expect_download() as transfer:
             self.page.get_by_role("button", name="Export blueprint JSON").click()
@@ -506,17 +516,17 @@ class EditorBrowserTests(unittest.TestCase):
         self.assertEqual(exported["name"], "Recoverable editor")
 
     def test_malformed_saved_draft_is_recoverable(self):
-        self.load(raw="{damaged")
-        self.graph_visible(0)
+        self.page.add_init_script(f"localStorage.setItem({json.dumps(KEY)}, '{{damaged')")
+        self.page.goto(URL + "/projects")
+        expect(self.page.get_by_text("A draft from this browser is available")).to_be_visible()
+        self.page.get_by_role("button", name="Import draft", exact=True).click()
+        expect(self.page.get_by_role("alert")).to_be_visible()
         self.assertEqual(self.page.evaluate("(key)=>localStorage.getItem(key)", KEY), "{damaged")
         with self.page.expect_download() as transfer:
-            self.page.get_by_role("button", name="Export original draft").click()
+            self.page.get_by_role("button", name="Export original", exact=True).click()
         self.assertEqual(Path(transfer.value.path()).read_text(), "{damaged")
-        self.import_graph(BASE)
-        self.assertEqual(
-            self.page.evaluate("(key)=>localStorage.getItem(key)", KEY + "-recovery"), "{damaged"
-        )
-        # Exports contain portable snapshots, with no React Flow rendering state.
+        self.load()
+        self.graph_visible(3)
         self.page.get_by_role("button", name="Project", exact=True).click()
         with self.page.expect_download() as transfer:
             self.page.get_by_role("button", name="Export blueprint JSON").click()
@@ -670,7 +680,7 @@ class EditorBrowserTests(unittest.TestCase):
     def test_compact_actions_and_internal_scrolling(self):
         self.page.set_viewport_size({"width": 768, "height": 600})
         blueprint = copy.deepcopy(BASE)
-        blueprint["name"] = "A long project title " * 30
+        blueprint["name"] = ("A long project title " * 30)[:160]
         blueprint["nodes"][0]["label"] = "VeryLongUnbrokenLabel" * 30
         blueprint["nodes"][0]["config"].update(
             {f"custom_{i}": "Extensive metadata" * 20 for i in range(50)}
@@ -682,8 +692,10 @@ class EditorBrowserTests(unittest.TestCase):
         self.page.get_by_role("navigation").get_by_role(
             "button", name="Projects", exact=True
         ).click()
-        expect(self.page.get_by_role("dialog")).to_be_visible()
-        self.page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).last.click()
+        expect(self.page.get_by_role("heading", name="Projects", exact=True)).to_be_visible()
+        self.page.locator(f'a[href="/projects/{self.current_project["id"]}"]').click()
+        self.graph_visible(3)
+        self.start_editing()
         self.page.get_by_role("button", name="Project", exact=True).click()
         expect(
             self.page.get_by_role("button", name="Import blueprint JSON", exact=True)
@@ -726,11 +738,11 @@ class EditorBrowserTests(unittest.TestCase):
     def test_layout_with_long_storage_error(self):
         self.page.set_viewport_size({"width": 768, "height": 600})
         self.page.add_init_script(
-            "Storage.prototype.getItem=function(){throw new Error('storage-denied-'.repeat(100))}"
+            "Storage.prototype.setItem=function(){throw new Error('storage-denied-'.repeat(100))}"
         )
-        self.page.goto(URL)
-        expect(self.page.get_by_role("alert")).to_contain_text("storage-denied")
-        expect(self.page.get_by_role("heading", name="Target HDF5 Design")).to_be_visible()
+        self.load()
+        self.page.get_by_label("Experiment title").fill("Long storage failure")
+        expect(self.page.get_by_role("alert")).to_contain_text("Local recovery is unavailable")
         self.assert_layout_bounds()
         self.assertLessEqual(self.page.get_by_role("alert").bounding_box()["height"], 96)
         self.page.locator(".statusbar").scroll_into_view_if_needed()
@@ -880,7 +892,7 @@ class EditorBrowserTests(unittest.TestCase):
         self.load()
         self.graph_visible(3)
         expect(self.page.get_by_role("alert")).to_contain_text("2 blocks and 1 connections")
-        self.assertEqual(self.stored(), BASE)
+        self.assert_base_blueprint()
         self.assertEqual(self.preview_requests, [])
         self.page.screenshot(path=str(OUT / "lowered-limits-preserved.png"))
         self.page.get_by_role("button", name="Project", exact=True).click()
@@ -898,7 +910,7 @@ class EditorBrowserTests(unittest.TestCase):
             }
         )
         expect(self.page.get_by_role("status")).to_contain_text("exceeds the server limit")
-        self.assertEqual(self.stored(), BASE)
+        self.assert_base_blueprint()
         self.node("daq").locator(".node-title").click()
         self.page.keyboard.press("Delete")
         self.graph_visible(2)
@@ -911,25 +923,22 @@ class EditorBrowserTests(unittest.TestCase):
 
     def test_failed_capabilities_preserve_saved_draft_until_retry(self):
         self.expected_http_statuses.add(503)
+        self.prepare_project()
         self.page.route(
             "**/api/capabilities",
             lambda route: route.fulfill(
                 status=503, json={"detail": "Capabilities temporarily unavailable"}
             ),
         )
-        raw = json.dumps(BASE)
-        self.page.add_init_script(
-            f"if(!sessionStorage.getItem('cap-seeded')){{localStorage.setItem({json.dumps(KEY)}, {json.dumps(raw)});sessionStorage.setItem('cap-seeded','yes')}}"
-        )
-        self.page.goto(URL)
-        expect(self.page.get_by_role("heading", name="Python backend unavailable")).to_be_visible()
-        self.assertEqual(self.page.evaluate("(key)=>localStorage.getItem(key)", KEY), raw)
+        self.page.goto(self.project_url)
+        expect(self.page.get_by_role("heading", name="Project unavailable")).to_be_visible()
+        self.assert_base_blueprint()
         self.page.unroute("**/api/capabilities")
-        self.page.get_by_role("button", name="Retry connection").click()
+        self.page.get_by_role("button", name="Retry", exact=True).click()
         self.graph_visible(3)
-        self.assertEqual(self.stored(), BASE)
+        self.assert_base_blueprint()
 
-    def test_demo_over_limit_starts_empty_and_remains_editable(self):
+    def test_empty_project_respects_configured_limits(self):
         self.page.route(
             "**/api/capabilities",
             lambda route: route.fulfill(
@@ -941,11 +950,9 @@ class EditorBrowserTests(unittest.TestCase):
                 }
             ),
         )
-        self.page.goto(URL)
+        self.load({"name": "Empty project", "version": "0.1", "nodes": [], "edges": []})
         self.graph_visible(0)
-        self.wait_saved()
         self.assertEqual(self.stored()["nodes"], [])
-        expect(self.page.get_by_label("Experiment title")).to_have_value("Untitled experiment")
         self.page.get_by_label("Experiment title").fill("Small experiment")
         self.wait_saved()
         self.assertEqual(self.stored()["name"], "Small experiment")

@@ -34,6 +34,7 @@ interface Props {
   onUpgrade: (id: string, template: CatalogItem) => Promise<void>;
   upgrading: boolean;
   referenceFields: ReactNode;
+  readOnly: boolean;
   onClose: () => void;
   onNotice: (text: string, error?: boolean) => void;
 }
@@ -51,6 +52,7 @@ export default function Inspector({
   onUpgrade,
   upgrading,
   referenceFields,
+  readOnly,
 }: Props) {
   const [upgradePreview, setUpgradePreview] = useState(false);
   const [newKey, setNewKey] = useState('');
@@ -65,7 +67,7 @@ export default function Inspector({
             <X size={17} />
           </button>
         </div>
-        <div className="inspector-scroll">
+        <fieldset className="inspector-scroll inspector-fields" disabled={readOnly}>
           <div className="inspector-profile-card">
             <span className="inspector-icon node-blue">
               <Settings2 size={25} />
@@ -97,7 +99,7 @@ export default function Inspector({
           <button className="delete-button" onClick={() => onDeleteEdge(edge.id)}>
             <Trash2 size={15} /> Delete connection
           </button>
-        </div>
+        </fieldset>
       </aside>
     );
   if (!node)
@@ -167,7 +169,7 @@ export default function Inspector({
           <X size={17} />
         </button>
       </div>
-      <div className="inspector-scroll">
+      <fieldset className="inspector-scroll inspector-fields" disabled={readOnly}>
         <div className="inspector-profile-card">
           <span className={`inspector-icon node-${tone}`}>
             <Icon size={29} strokeWidth={1.5} />
@@ -348,7 +350,7 @@ export default function Inspector({
         {referenceFields}
         <div className="metadata-values">
           <div className="metadata-heading">
-            Metadata values <span>Editable</span>
+            Metadata values <span>{readOnly ? 'Read only' : 'Editable'}</span>
           </div>
           {fields.map((k) => (
             <div key={k} className="metadata-row">
@@ -435,7 +437,7 @@ export default function Inspector({
           <CircleHelp size={13} /> Metadata conformance does not imply complete FAIR compliance or
           scientific correctness.
         </p>
-      </div>
+      </fieldset>
     </aside>
   );
 }

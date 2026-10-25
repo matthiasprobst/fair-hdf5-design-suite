@@ -4,6 +4,7 @@ import type { CatalogItem } from '../types';
 import { useLibraryEditor } from '../library/useLibraryEditor';
 import { TurtleImport } from '../library/TurtleImport';
 import { TemplateFields } from '../library/TemplateFields';
+import { useCanEdit } from '../projects/EditorSessionContext';
 
 export default function LibraryEditor({
   template,
@@ -13,6 +14,7 @@ export default function LibraryEditor({
   onClose: () => void;
 }) {
   const editor = useLibraryEditor(template, onClose);
+  const canEdit = useCanEdit();
   const {
     mode,
     setMode,
@@ -52,12 +54,16 @@ export default function LibraryEditor({
           <div className="modal-head">
             <div>
               <Dialog.Title>
-                {template ? `Edit ${template.label}` : 'Create library template'}
+                {template
+                  ? `${template.project_local ? 'Edit' : 'Copy'} ${template.label}`
+                  : 'Create project template'}
               </Dialog.Title>
               <Dialog.Description>
                 {template
-                  ? `Saving creates revision ${(template.revision || 1) + 1}. Existing nodes keep their current revision.`
-                  : 'Create a reusable template or import a SHACL Turtle file.'}
+                  ? template.project_local
+                    ? `Saving creates revision ${(template.revision || 1) + 1}. Existing nodes keep their current revision.`
+                    : 'Create a project copy. The shared original stays available.'
+                  : 'Create a template or import Turtle. Only project members can access it.'}
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -69,7 +75,7 @@ export default function LibraryEditor({
             </Dialog.Close>
           </div>
           <div className="library-editor-body">
-            <fieldset className="library-editor-fields" disabled={busy}>
+            <fieldset className="library-editor-fields" disabled={busy || !canEdit}>
               {!template && (
                 <div className="library-mode">
                   <button aria-pressed={mode === 'form'} onClick={() => setMode('form')}>
@@ -170,11 +176,19 @@ export default function LibraryEditor({
             </button>
             <button
               disabled={
-                busy || !label.trim() || !category.trim() || (mode === 'turtle' && !analyzed)
+                busy ||
+                !canEdit ||
+                !label.trim() ||
+                !category.trim() ||
+                (mode === 'turtle' && !analyzed)
               }
               onClick={() => void save()}
             >
-              {busy ? 'Processing…' : template ? 'Publish new revision' : 'Save to library'}
+              {busy
+                ? 'Processing…'
+                : template?.project_local
+                  ? 'Publish new revision'
+                  : 'Save to project'}
             </button>
           </footer>
         </Dialog.Content>

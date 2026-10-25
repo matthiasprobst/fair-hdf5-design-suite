@@ -64,6 +64,7 @@ export interface ProfileField {
   flags?: string;
 }
 export interface CatalogItem {
+  project_local?: boolean;
   initial?: CatalogItem;
   schema_version?: number;
   source_uri?: string;

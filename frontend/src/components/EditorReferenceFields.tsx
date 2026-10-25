@@ -1,5 +1,6 @@
 import type { DesignNode } from '../types';
-import { editorStore, useEditor } from '../editor/store';
+import { useEditor } from '../editor/store';
+import { useEditorStore } from '../editor/context';
 import ReferenceFields from './ReferenceFields';
 
 export function EditorReferenceFields({
@@ -9,6 +10,7 @@ export function EditorReferenceFields({
   node: DesignNode;
   onNotice: (message: string, error?: boolean) => void;
 }) {
+  const editorStore = useEditorStore();
   const nodes = useEditor((s) => s.nodes);
   const edges = useEditor((s) => s.edges);
   const limits = useEditor((s) => s.capabilities);
