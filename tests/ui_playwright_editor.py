@@ -114,7 +114,6 @@ class EditorBrowserTests(unittest.TestCase):
         self.project_url = URL + "/projects/" + self.current_project["id"]
 
     def start_editing(self):
-        self.page.get_by_role("button", name="Edit project", exact=True).click()
         expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
 
     def load(self, blueprint=BASE):
@@ -383,6 +382,9 @@ class EditorBrowserTests(unittest.TestCase):
         expect(self.page.get_by_role("button", name="Edit project", exact=True)).to_be_visible()
         self.page.reload()
         self.graph_visible(4)
+        self.start_editing()
+        self.page.get_by_role("button", name="Finish editing", exact=True).click()
+        expect(self.page.get_by_role("button", name="Edit project", exact=True)).to_be_visible()
         self.node(source_id).locator(".node-title").click()
         expect(
             self.page.get_by_text("measurements.csv · Select file again", exact=True)

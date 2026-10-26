@@ -112,13 +112,13 @@ class ProjectBrowserTests(unittest.TestCase):
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 768)
         self.page.screenshot(path=str(OUT / "projects-compact.png"), full_page=True)
         self.page.get_by_role("link", name=self.name, exact=True).click()
-        expect(self.page.get_by_label("Experiment title")).to_have_attribute("readonly", "")
+        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
+        expect(self.page.get_by_label("Experiment title")).to_be_editable()
         status = self.context.request.get(
             URL + f"/api/projects/{self.project['id']}/edit-lock"
         ).json()
-        self.assertIsNone(status["edit_lock"], "Viewing must not reserve a project")
-        self.page.get_by_role("button", name="Edit project", exact=True).click()
-        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
+        self.assertIsNotNone(status["edit_lock"], "Opening an editable project must reserve it")
+        self.page.screenshot(path=str(OUT / "automatic-edit-reservation.png"), full_page=True)
         renamed = self.name + " saved"
         self.page.get_by_label("Experiment title").fill(renamed)
         expect(self.page.locator(".saved-text")).to_contain_text("Saved on server")
@@ -126,7 +126,7 @@ class ProjectBrowserTests(unittest.TestCase):
         expect(self.page.get_by_role("button", name="Edit project", exact=True)).to_be_visible()
         self.page.reload()
         expect(self.page.get_by_label("Experiment title")).to_have_value(renamed)
-        expect(self.page.get_by_label("Experiment title")).to_have_attribute("readonly", "")
+        expect(self.page.get_by_label("Experiment title")).to_be_editable()
         self.page.get_by_role("button", name="Back to projects", exact=True).click()
         expect(self.page.get_by_role("heading", name="Projects", exact=True)).to_be_visible()
         self.page.get_by_label("Search projects", exact=True).fill(renamed)
@@ -165,8 +165,9 @@ class ProjectBrowserTests(unittest.TestCase):
             viewer.get_by_role("button", name="Export blueprint JSON", exact=True).click()
         self.assertEqual(json.loads(Path(download.value.path()).read_text())["name"], self.name)
         self.share("qaviewer", "editor")
+        self.page.get_by_role("button", name="Finish editing", exact=True).click()
+        expect(self.page.get_by_role("button", name="Edit project", exact=True)).to_be_visible()
         viewer.reload()
-        viewer.get_by_role("button", name="Edit project", exact=True).click()
         expect(viewer.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
         viewer.get_by_label("Experiment title").fill(self.name + " by member")
         expect(viewer.locator(".saved-text")).to_contain_text("Saved on server")
@@ -179,10 +180,11 @@ class ProjectBrowserTests(unittest.TestCase):
 
     def test_two_tabs_in_the_same_login_cannot_edit_together(self):
         self.open()
+        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
         second = self.context.new_page()
         self.open(second)
-        self.page.get_by_role("button", name="Edit project", exact=True).click()
-        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
+        expect(second.get_by_label("Experiment title")).to_have_attribute("readonly", "")
+        expect(second.locator(".project-session-banner")).to_contain_text("is editing this project")
         second.get_by_role("button", name="Edit project", exact=True).click()
         expect(second.get_by_role("alert")).to_contain_text("is editing this project")
         expect(second.get_by_label("Experiment title")).to_have_attribute("readonly", "")
@@ -194,7 +196,6 @@ class ProjectBrowserTests(unittest.TestCase):
 
     def test_navigation_saves_then_releases_the_reservation(self):
         self.open()
-        self.page.get_by_role("button", name="Edit project", exact=True).click()
         expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
         self.page.get_by_label("Experiment title").fill(self.name + " before leaving")
         self.page.get_by_role("button", name="Projects", exact=True).click()
@@ -206,7 +207,6 @@ class ProjectBrowserTests(unittest.TestCase):
     def test_failed_save_preserves_export_and_private_copy(self):
         self.allowed_statuses.add(503)
         self.open()
-        self.page.get_by_role("button", name="Edit project", exact=True).click()
         expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
         pattern = "**/api/projects/" + self.project["id"]
 

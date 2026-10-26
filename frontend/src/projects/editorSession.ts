@@ -36,6 +36,7 @@ export class ProjectEditorSession {
   private queue: Promise<void> = Promise.resolve();
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
+  private lifecycle = 0;
   private suppress = false;
   private generation = 0;
   private archived = false;
@@ -87,6 +88,11 @@ export class ProjectEditorSession {
 
   start() {
     this.stopped = false;
+    const lifecycle = ++this.lifecycle;
+    this.state.setState((s) => ({
+      busy: false,
+      mode: s.mode === 'editing' && !this.token ? 'view' : s.mode,
+    }));
     const stopArtifacts = this.artifacts.start();
     const stopCsv = this.csv.start();
     const stopAccess = this.state.subscribe((s) => {
@@ -159,8 +165,21 @@ export class ProjectEditorSession {
     };
     window.addEventListener('beforeunload', beforeUnload);
     window.addEventListener('pagehide', hide);
+    // Wait until React's effect setup/cleanup replay has settled before reserving.
+    queueMicrotask(() => {
+      if (this.stopped || this.lifecycle !== lifecycle) return;
+      const { project, mode, dirty } = this.state.getState();
+      if (
+        mode === 'view' &&
+        !dirty &&
+        project.role !== 'viewer' &&
+        (!project.edit_lock || project.edit_lock.expires_at <= Date.now() / 1000)
+      )
+        void this.edit(true);
+    });
     return () => {
       this.stopped = true;
+      this.lifecycle++;
       clearTimeout(this.saveTimer);
       clearInterval(heartbeat);
       clearInterval(poll);
@@ -227,8 +246,16 @@ export class ProjectEditorSession {
     this.baseRevision = project.revision;
   }
 
-  async edit() {
-    if (this.state.getState().busy) return;
+  async edit(automatic = false) {
+    if (
+      this.stopped ||
+      this.state.getState().busy ||
+      this.state.getState().project.role === 'viewer' ||
+      this.canEdit()
+    )
+      return;
+    const lifecycle = this.lifecycle;
+    const current = () => !this.stopped && this.lifecycle === lifecycle;
     this.state.setState({ busy: true, error: '' });
     const id = this.state.getState().project.id;
     try {
@@ -236,14 +263,16 @@ export class ProjectEditorSession {
         this.token && this.state.getState().mode === 'paused'
           ? { token: this.token, expires_at: await projectApi.renew(id, this.token) }
           : await projectApi.acquire(id, this.editorId);
-      this.token = lease.token;
-      this.expires = lease.expires_at;
-      const [{ catalog }] = await Promise.all([projectApi.catalog(id)]);
-      const project = await projectApi.get(id, catalog);
-      if (this.stopped) {
-        await projectApi.release(id, lease.token);
+      if (!current()) {
+        await projectApi.release(id, lease.token).catch(() => {});
         return;
       }
+      this.token = lease.token;
+      this.expires = lease.expires_at;
+      const { catalog } = await projectApi.catalog(id);
+      if (!current()) return;
+      const project = await projectApi.get(id, catalog);
+      if (!current()) return;
       if (this.state.getState().dirty && this.baseRevision !== project.revision) {
         await projectApi.release(id, lease.token);
         this.token = null;
@@ -260,12 +289,18 @@ export class ProjectEditorSession {
       });
       if (this.state.getState().dirty) await this.save();
     } catch (e) {
+      if (!current()) return;
       const token = this.token;
       this.token = null;
       if (token) void projectApi.release(id, token).catch(() => {});
-      this.state.setState({ error: errorMessage(e) });
+      if (automatic && e instanceof ApiError && e.status === 423) {
+        // Another tab won the reservation after the initial project response.
+        await this.refresh().catch((error) => {
+          if (current()) this.state.setState({ error: errorMessage(error) });
+        });
+      } else this.state.setState({ error: errorMessage(e) });
     } finally {
-      this.state.setState({ busy: false });
+      if (current()) this.state.setState({ busy: false });
     }
   }
 

@@ -18,7 +18,7 @@ Workflow connections describe experimental relationships. HDF5 paths describe th
 
 ## Build HDF5 with CSV data
 
-1. Open a project, choose **Edit project**, and add **CSV Source** from **Data inputs**.
+1. Open an unlocked project and add **CSV Source** from **Data inputs**. Editing starts automatically when you have edit permission.
 2. Set the delimiter, decimal separator, and header option, then select a UTF-8 CSV file. The inspector shows column types and previews the first 50 rows.
 3. Select columns and choose **Create datasets from selected columns**. Alternatively, connect the source's square output to an existing Dataset node's square input, then select its column in the inspector. Round ports continue to describe experimental relationships.
 4. Configure each dataset's path, datatype, metadata, and unit. Each column becomes a one-dimensional dataset. Shape `0` uses the CSV row count; a fixed shape must match exactly. `string` creates variable-length UTF-8 text datasets. Suggested datatypes are editable; use `string` for identifiers whose leading zeros must be preserved.
@@ -112,8 +112,11 @@ private. Owners share with existing usernames as **Can view** or **Can edit**.
 Viewers can inspect, validate, export and make a private copy. Only owners manage
 members or delete projects. Copies do not inherit members or reservations.
 
-Projects open in view mode. **Edit project** requests a reservation for the current
-browser tab; **Finish editing** saves and releases it. Another tab, even under the
+Opening an unlocked project automatically reserves it for the current browser tab
+and starts editing when you have edit permission. Viewers and tabs opening an
+already reserved project remain in view mode. **Finish editing** saves and releases
+the reservation, leaving the current page in view mode; **Edit project** can request
+it again. Another tab, even under the
 same account, stays read-only. Reservations last 120 seconds and renew every 30
 seconds while editing. There is no forced takeover. After a crash or lost
 connection, a reservation expires automatically. Reloads normally release it; if

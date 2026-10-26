@@ -31,7 +31,7 @@ const project: Project = {
   blueprint,
   edit_lock: null,
 };
-function setup(t: TestContext) {
+function setup(t: TestContext, initial = project) {
   const values = new Map<string, string>();
   const storage = {
     getItem: (k: string) => values.get(k) ?? null,
@@ -54,10 +54,10 @@ function setup(t: TestContext) {
     else Reflect.deleteProperty(globalThis, 'window');
     mock.restoreAll();
   });
-  let server = structuredClone(project);
+  let server = structuredClone(initial);
   mock.method(projectApi, 'get', async () => structuredClone(server));
   mock.method(projectApi, 'catalog', async () => ({ catalog: {}, profile_source: 'Test' }));
-  mock.method(projectApi, 'acquire', async () => ({
+  const acquire = mock.method(projectApi, 'acquire', async () => ({
     token: 'lease-one',
     expires_at: Date.now() / 1000 + 120,
     revision: server.revision,
@@ -90,12 +90,14 @@ function setup(t: TestContext) {
       return structuredClone(server);
     },
   );
-  const session = new ProjectEditorSession(structuredClone(project), {}, capabilities, 'alice');
+  const session = new ProjectEditorSession(structuredClone(initial), {}, capabilities, 'alice');
   const stopSession = session.start();
   return {
     session,
     values,
     save,
+    acquire,
+    stopSession,
     setServer: (value: Project) => {
       server = value;
     },
@@ -178,13 +180,130 @@ test('session contracts carry and validate the server password policy', () => {
   }
 });
 
-test('viewing a project never acquires a lease or saves', async (t) => {
-  const { session, save } = setup(t);
+test('opening an unlocked project automatically reserves it without saving', async (t) => {
+  const { session, save, acquire } = setup(t);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(acquire.mock.callCount(), 1);
+  assert.equal(session.state.getState().mode, 'editing');
+  assert.equal(session.canEdit(), true);
+  assert.equal(session.state.getState().dirty, false);
+  assert.equal(save.mock.callCount(), 0);
+  await session.finish();
+  await session.refresh();
+  assert.equal(session.state.getState().mode, 'view');
+  assert.equal(acquire.mock.callCount(), 1, 'Finishing must not immediately reacquire the lock');
+});
+
+test('view-only projects never acquire a lease or save', async (t) => {
+  const { session, save, acquire } = setup(t, { ...project, role: 'viewer' });
+  await new Promise<void>((resolve) => setImmediate(resolve));
   session.graph.getState().rename('Not allowed');
   assert.equal(session.graph.getState().name, project.name);
   assert.equal(session.state.getState().dirty, false);
   await session.save();
+  await session.edit();
+  assert.equal(acquire.mock.callCount(), 0);
   assert.equal(save.mock.callCount(), 0);
+});
+
+test('editors automatically reserve projects with an expired lock snapshot', async (t) => {
+  const { session, acquire } = setup(t, {
+    ...project,
+    role: 'editor',
+    edit_lock: {
+      user_id: 'bob',
+      display_name: 'Bob',
+      expires_at: Date.now() / 1000 - 1,
+    },
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(acquire.mock.callCount(), 1);
+  assert.equal(session.canEdit(), true);
+});
+
+test('opening a reserved project remains read-only without attempting acquisition', async (t) => {
+  const { session, acquire } = setup(t, {
+    ...project,
+    edit_lock: {
+      user_id: 'alice',
+      display_name: 'Alice',
+      expires_at: Date.now() / 1000 + 120,
+    },
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(acquire.mock.callCount(), 0);
+  assert.equal(session.canEdit(), false);
+  assert.equal(session.state.getState().error, '');
+});
+
+test('a race for automatic reservation refreshes the lock and remains in view mode', async (t) => {
+  const { session, setServer } = setup(t);
+  const edit_lock = { user_id: 'bob', display_name: 'Bob', expires_at: Date.now() / 1000 + 120 };
+  setServer({ ...project, edit_lock });
+  mock.method(projectApi, 'acquire', async () => {
+    throw new ApiError(423, 'project_locked', 'Bob is editing');
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(session.state.getState().mode, 'view');
+  assert.equal(session.state.getState().error, '');
+  assert.deepEqual(session.state.getState().project.edit_lock, edit_lock);
+});
+
+test('automatic reservation failures leave an explicit retry available', async (t) => {
+  const { session } = setup(t);
+  mock.method(projectApi, 'acquire', async () => {
+    throw new Error('Connection unavailable');
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(session.state.getState().mode, 'view');
+  assert.equal(session.state.getState().busy, false);
+  assert.match(session.state.getState().error, /Connection unavailable/);
+});
+
+test('effect cleanup/restart acquires once and releases a late reservation on exit', async (t) => {
+  const { session, stopSession, acquire } = setup(t);
+  stopSession();
+  const stop = session.start();
+  let resolveLease!: (value: { token: string; expires_at: number; revision: number }) => void;
+  const pendingAcquire = mock.method(
+    projectApi,
+    'acquire',
+    () =>
+      new Promise((resolve) => {
+        resolveLease = resolve;
+      }),
+  );
+  const release = mock.method(projectApi, 'release', async () => new Response('{}'));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(acquire.mock.callCount(), 0, 'The replayed initial acquisition was cancelled');
+  assert.equal(pendingAcquire.mock.callCount(), 1);
+  stop();
+  resolveLease({ token: 'late-lease', expires_at: Date.now() / 1000 + 120, revision: 1 });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(release.mock.callCount(), 1);
+  assert.equal(release.mock.calls[0].arguments[1], 'late-lease');
+  assert.equal(session.canEdit(), false);
+});
+
+test('leaving during automatic catalog loading releases the acquired reservation', async (t) => {
+  const { session, stopSession } = setup(t);
+  let resolveCatalog!: (value: { catalog: {}; profile_source: string }) => void;
+  mock.method(
+    projectApi,
+    'catalog',
+    () =>
+      new Promise((resolve) => {
+        resolveCatalog = resolve;
+      }),
+  );
+  const release = mock.method(projectApi, 'release', async () => new Response('{}'));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  stopSession();
+  resolveCatalog({ catalog: {}, profile_source: 'Test' });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(release.mock.callCount(), 1);
+  assert.equal(session.canEdit(), false);
+  assert.equal(session.state.getState().mode, 'view');
 });
 
 test('save queue preserves edits and description changes made during an in-flight save', async (t) => {
