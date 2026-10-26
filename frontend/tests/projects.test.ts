@@ -8,7 +8,7 @@ import { ProjectEditorSession, draftKey } from '../src/projects/editorSession';
 import { ApiError } from '../src/lib/http';
 import { api } from '../src/lib/api';
 import type { Project } from '../src/projects/types';
-import type { Blueprint, TemplateSnapshot } from '../src/types';
+import type { Blueprint, Catalog, TemplateSnapshot } from '../src/types';
 
 const capabilities = {
   max_nodes: 10,
@@ -287,7 +287,7 @@ test('effect cleanup/restart acquires once and releases a late reservation on ex
 
 test('leaving during automatic catalog loading releases the acquired reservation', async (t) => {
   const { session, stopSession } = setup(t);
-  let resolveCatalog!: (value: { catalog: {}; profile_source: string }) => void;
+  let resolveCatalog!: (value: { catalog: Catalog; profile_source: string }) => void;
   mock.method(
     projectApi,
     'catalog',
