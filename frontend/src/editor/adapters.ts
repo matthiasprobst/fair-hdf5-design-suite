@@ -10,7 +10,13 @@ export type ScientificData = {
   template?: CatalogItem;
 };
 export type ScientificFlowNode = Node<ScientificData, 'scientific'>;
-export type ScientificFlowEdge = Edge<{ relation: string; field_id?: string; predicate?: string }>;
+export type ScientificFlowEdge = Edge<{
+  relation: string;
+  field_id?: string;
+  predicate?: string;
+  kind?: 'data';
+  column_index?: number;
+}>;
 export type Graph = {
   name: string;
   version: string;
@@ -45,14 +51,25 @@ export function fromEdge(e: DesignEdge): ScientificFlowEdge {
     id: e.id,
     source: e.source,
     target: e.target,
-    sourceHandle: 'out',
-    targetHandle: 'in',
+    sourceHandle: e.kind === 'data' ? 'data-out' : 'out',
+    targetHandle: e.kind === 'data' ? 'data-in' : 'in',
     type: 'smoothstep',
     animated: false,
     style: { stroke: color, strokeWidth: 2.5 },
     markerEnd: { type: MarkerType.ArrowClosed, color, width: 15, height: 15 },
-    label: e.predicate ? e.relation : undefined,
-    data: { relation: e.relation, field_id: e.field_id, predicate: e.predicate },
+    label:
+      e.kind === 'data'
+        ? `Column ${(e.column_index ?? 0) + 1}`
+        : e.predicate
+          ? e.relation
+          : undefined,
+    data: {
+      relation: e.relation,
+      field_id: e.field_id,
+      predicate: e.predicate,
+      kind: e.kind,
+      column_index: e.column_index,
+    },
   };
 }
 export function toNode(n: ScientificFlowNode): DesignNode {
@@ -72,6 +89,9 @@ export function toEdge(e: ScientificFlowEdge): DesignEdge {
     source: e.source,
     target: e.target,
     relation: e.data?.relation ?? 'related_to',
+    ...(e.data?.kind === 'data'
+      ? { kind: 'data' as const, column_index: e.data.column_index }
+      : {}),
     ...(e.data?.field_id !== undefined
       ? { field_id: e.data.field_id, predicate: e.data.predicate }
       : {}),

@@ -1,10 +1,13 @@
 from typing import Any
 
 from .catalog import CATALOG
+from .data_nodes import CSV_INFO, CSV_SOURCE
 from .vocabulary import PROFILES
 
 
 def node_template(node: dict[str, Any]) -> dict:
+    if node["type"] == CSV_SOURCE:
+        return CSV_INFO
     return node.get("template") or CATALOG[node["type"]]
 
 

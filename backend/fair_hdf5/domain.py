@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .catalog import CATALOG
+from .data_nodes import CSV_SOURCE, validate_data_edges, validate_source
 from .errors import DesignError
 from .profile_schema import absolute_iri
 from .profiles import node_template
@@ -59,7 +60,11 @@ def parse_blueprint(
     design.setdefault("version", model.version)
     design.setdefault("edges", [])
     for node in design["nodes"]:
-        if node.get("template") is not None:
+        if node["type"] == CSV_SOURCE:
+            if "template" in node:
+                raise DesignError("CSV sources cannot have SHACL templates.")
+            node["config"] = validate_source(node.get("config", {}))
+        elif node.get("template") is not None:
             node["template"] = validate_snapshot(node["template"], settings=settings)
             if node["template"]["id"] != node["type"]:
                 raise DesignError("Node type and template ID do not match.")
@@ -95,7 +100,9 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
     paths: dict[str, str] = {}
     for node in nodes:
         if not isinstance(node, dict) or (
-            not node.get("template") and node.get("type") not in CATALOG
+            not node.get("template")
+            and node.get("type") not in CATALOG
+            and node.get("type") != CSV_SOURCE
         ):
             raise DesignError("Unknown node type.")
         id = node.get("id", "")
@@ -107,7 +114,10 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
         if not isinstance(node.get("config", {}), dict):
             raise DesignError(f"Node {id}: configuration must be an object.")
         config = node.get("config", {})
-        _validate_metadata(node, settings)
+        if node["type"] == CSV_SOURCE:
+            validate_source(config)
+        else:
+            _validate_metadata(node, settings)
         kind = node_template(node)["kind"]
         if kind:
             path = config.get("path", "")
@@ -177,6 +187,7 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
             if key in semantic_keys:
                 raise DesignError("Duplicate semantic relationship.")
             semantic_keys.add(key)
+    validate_data_edges(design)
     return dataset_shapes
 
 

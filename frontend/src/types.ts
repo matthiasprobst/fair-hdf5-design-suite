@@ -18,6 +18,8 @@ export interface DesignEdge {
   relation: string;
   field_id?: string;
   predicate?: string;
+  kind?: 'data';
+  column_index?: number;
 }
 export interface Blueprint {
   name: string;

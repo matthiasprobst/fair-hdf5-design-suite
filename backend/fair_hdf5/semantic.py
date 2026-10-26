@@ -122,7 +122,7 @@ def rdf_from_hdf5(design: dict[str, Any], f: h5py.File) -> Graph:
     graph = Graph()
     graph.bind("h5", H5)
     graph.bind("meta", META)
-    by_path = {n["config"]["path"]: n for n in design["nodes"]}
+    by_path = {n["config"]["path"]: n for n in design["nodes"] if node_template(n)["kind"]}
     for node in design["nodes"]:
         kind = node_template(node)["kind"]
         if not kind:

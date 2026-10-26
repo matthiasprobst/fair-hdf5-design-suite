@@ -2,6 +2,7 @@ import { graphLimitError } from './limits';
 import type { Capabilities } from './limits';
 import type { Blueprint, Catalog, CatalogItem, DesignNode, DesignEdge, NodeType } from '../types';
 import { isRecord, isConfig, isTemplateSnapshot } from '../lib/validation';
+import { CSV_SOURCE, sourceConfig } from './dataNodes';
 
 // Validate the storage/import envelope, not scientific constraints. Incomplete
 // paths and metadata must remain editable even when the backend rejects them.
@@ -33,7 +34,9 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
       return fail('node IDs must be valid and unique.');
     if (
       typeof n.type !== 'string' ||
-      (!Object.prototype.hasOwnProperty.call(catalog, n.type) && !object(n.template)) ||
+      (n.type !== CSV_SOURCE &&
+        !Object.prototype.hasOwnProperty.call(catalog, n.type) &&
+        !object(n.template)) ||
       typeof n.label !== 'string' ||
       typeof n.x !== 'number' ||
       !Number.isFinite(n.x) ||
@@ -43,6 +46,8 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
     )
       return fail(`invalid node ${n.id}.`);
     let template: CatalogItem | undefined;
+    if (n.type === CSV_SOURCE && n.template !== undefined)
+      return fail('CSV sources cannot have SHACL templates.');
     if (n.template !== undefined) {
       if (!isTemplateSnapshot(n.template) || n.template.id !== n.type)
         return fail(`invalid template snapshot in ${n.id}.`);
@@ -52,7 +57,7 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
     else if (catalog[n.type]?.revision)
       return fail(`legacy node ${n.id} needs its original template revision.`);
     if (!isConfig(n.config)) return fail(`unsupported metadata in ${n.id}.`);
-    const config = structuredClone(n.config);
+    const config = n.type === CSV_SOURCE ? sourceConfig(n.config) : structuredClone(n.config);
     ids.add(n.id);
     return {
       id: n.id,
@@ -65,6 +70,7 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
     };
   });
   const edgeIds = new Set<string>();
+  const dataTargets = new Set<string>();
   const edges = value.edges.map((e): DesignEdge => {
     if (
       !object(e) ||
@@ -83,12 +89,35 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
       (typeof e.field_id !== 'string' || typeof e.predicate !== 'string')
     )
       return fail('invalid semantic relationship.');
+    if (e.kind !== undefined && e.kind !== 'data') return fail('unknown connection kind.');
+    const source = nodes.find((n) => n.id === e.source)!;
+    const target = nodes.find((n) => n.id === e.target)!;
+    if (e.kind === 'data') {
+      if (
+        source.type !== CSV_SOURCE ||
+        (target.template || catalog[target.type])?.kind !== 'dataset' ||
+        dataTargets.has(target.id) ||
+        e.field_id !== undefined ||
+        e.predicate !== undefined ||
+        typeof e.column_index !== 'number' ||
+        !Number.isInteger(e.column_index) ||
+        e.column_index < 0
+      )
+        return fail('invalid data connection.');
+      dataTargets.add(target.id);
+    } else if (
+      source.type === CSV_SOURCE ||
+      target.type === CSV_SOURCE ||
+      e.column_index !== undefined
+    )
+      return fail('CSV sources require data connections.');
     edgeIds.add(e.id);
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       relation: e.relation,
+      ...(e.kind === 'data' ? { kind: 'data', column_index: e.column_index as number } : {}),
       ...(e.field_id !== undefined
         ? { field_id: e.field_id as string, predicate: e.predicate as string }
         : {}),

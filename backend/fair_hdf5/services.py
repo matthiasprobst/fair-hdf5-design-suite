@@ -9,6 +9,7 @@ from rdflib.compare import isomorphic
 from rdflib.namespace import SH
 
 from .catalog import CATALOG
+from .data_nodes import CSV_SOURCE
 from .domain import ValidatedBlueprint, parse_blueprint
 from .engines import ValidationEngine, create_engine
 from .errors import DesignError, RevisionConflict, UploadTooLarge
@@ -41,6 +42,8 @@ class DesignService:
         blueprint = parse_blueprint(value, self.settings, self.repository)
         if self.settings.shacl_engine != "pyshacl":
             for node in blueprint.data["nodes"]:
+                if node["type"] == CSV_SOURCE:
+                    continue
                 info = node["template"]
                 if info.get("requires_pyshacl"):
                     raise DesignError(

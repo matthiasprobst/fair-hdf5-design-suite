@@ -230,7 +230,9 @@ def structural_checks(design, f, dataset_shapes):
                             }
                         )
                         continue
-                    expected_paths = {n["config"]["path"] for n in design["nodes"]}
+                    expected_paths = {
+                        n["config"]["path"] for n in design["nodes"] if node_template(n)["kind"]
+                    }
                     actual_references = set()
                     for reference in value:
                         try:

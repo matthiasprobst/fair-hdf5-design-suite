@@ -6,6 +6,8 @@ import re
 from copy import deepcopy
 
 from .access import fail
+from .data_nodes import CSV_SOURCE, validate_data_edges, validate_source
+from .errors import DesignError
 from .templates import validate_snapshot
 
 
@@ -71,7 +73,14 @@ def editable_blueprint(value, settings, catalog):
             ):
                 invalid()
         saved = {k: deepcopy(node[k]) for k in ("id", "type", "label", "x", "y", "config")}
-        if "template" in node:
+        if node["type"] == CSV_SOURCE:
+            if "template" in node:
+                invalid()
+            try:
+                saved["config"] = validate_source(config)
+            except DesignError:
+                invalid()
+        elif "template" in node:
             snapshot = validate_snapshot(node["template"], settings=settings)
             if snapshot["id"] != node["type"]:
                 invalid()
@@ -93,12 +102,20 @@ def editable_blueprint(value, settings, catalog):
         ):
             invalid()
         saved = {k: edge[k] for k in ("id", "source", "target", "relation")}
+        if "kind" in edge:
+            saved["kind"] = edge["kind"]
+        if "column_index" in edge:
+            saved["column_index"] = edge["column_index"]
         if "field_id" in edge or "predicate" in edge:
             if not all(isinstance(edge.get(k), str) for k in ("field_id", "predicate")):
                 invalid()
             saved.update(field_id=edge["field_id"], predicate=edge["predicate"])
         edge_ids.add(edge["id"])
         result["edges"].append(saved)
+    try:
+        validate_data_edges(result)
+    except DesignError:
+        invalid()
     try:
         encoded = json.dumps(result, allow_nan=False)
     except (ValueError, TypeError):
