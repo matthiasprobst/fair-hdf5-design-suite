@@ -3,6 +3,7 @@
 import copy
 import io
 import json
+from unittest.mock import patch
 
 import h5py
 from fair_hdf5.application import create_app
@@ -85,6 +86,8 @@ class CsvTests(CatalogTestCase):
             ("float64", "NaN"),
             ("float64", "inf"),
             ("float32", "1e100"),
+            ("float32", "1e-100"),
+            ("float64", "1e-1000"),
             ("int32", "1.5"),
             ("int32", "2147483648"),
             ("uint8", "-1"),
@@ -107,6 +110,15 @@ class CsvTests(CatalogTestCase):
         raw = self.service.data_file(design, {"csv": io.BytesIO(b"pressure\n9007199254740993\n")})
         with h5py.File(io.BytesIO(raw), "r") as handle:
             self.assertEqual(int(handle["/data/pressure"][0]), 9007199254740993)
+
+    def test_blank_records_are_not_silently_dropped(self):
+        design = data_design()
+        with self.assertRaisesRegex(DesignError, "row 2, column 1"):
+            self.service.data_file(design, {"csv": io.BytesIO(b"pressure\n\n1\n")})
+        design["nodes"][1]["config"]["dtype"] = "string"
+        raw = self.service.data_file(design, {"csv": io.BytesIO(b"pressure\n\ntext\n")})
+        with h5py.File(io.BytesIO(raw), "r") as handle:
+            self.assertEqual(handle["/data/pressure"].asstr()[:].tolist(), ["", "text"])
 
     def test_duplicate_headers_use_column_position(self):
         design = data_design()
@@ -166,3 +178,47 @@ class CsvTests(CatalogTestCase):
             self.assertEqual(response.headers["cache-control"], "no-store")
             bad = client.post("/api/export/hdf5/data", data={"design_json": "{}"})
             self.assertEqual(bad.status_code, 422)
+
+    def test_combined_upload_budget_and_request_owned_files(self):
+        design = data_design()
+        source = copy.deepcopy(design["nodes"][0])
+        source["id"] = "second"
+        target = copy.deepcopy(design["nodes"][1])
+        target["id"] = "second_values"
+        target["config"]["path"] = "/data/second"
+        design["nodes"].extend([source, target])
+        design["edges"].append(
+            {
+                **design["edges"][0],
+                "id": "second_edge",
+                "source": "second",
+                "target": "second_values",
+            }
+        )
+        with self.assertRaises(UploadTooLarge):
+            DesignService(Settings(_env_file=None, max_upload_bytes=20)).data_file(
+                design,
+                {"csv": io.BytesIO(b"pressure\n1\n"), "second": io.BytesIO(b"pressure\n2\n")},
+            )
+        with self.assertRaises(UploadTooLarge):
+            DesignService(Settings(_env_file=None, max_dataset_elements=3)).data_file(
+                design,
+                {"csv": io.BytesIO(b"pressure\n1\n"), "second": io.BytesIO(b"pressure\n2\n")},
+            )
+        app = create_app(self.settings)
+        seen = []
+
+        def fail_build(value, files):
+            seen.extend(files.values())
+            raise DesignError("Expected conversion failure.")
+
+        with authenticated_client(TestClient(app)) as client:
+            with patch.object(app.state.design_service, "data_file", side_effect=fail_build):
+                response = client.post(
+                    "/api/export/hdf5/data",
+                    data={"design_json": json.dumps(data_design())},
+                    files={"csv": ("test.csv", b"pressure\n1\n")},
+                )
+            self.assertEqual(response.status_code, 422)
+        self.assertTrue(seen)
+        self.assertTrue(all(file.closed for file in seen))

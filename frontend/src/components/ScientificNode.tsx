@@ -15,7 +15,7 @@ function ScientificNodeBase({ id, data, selected }: NodeProps<ScientificFlowNode
   const input = useStore(session.csv.store, (s) => s.inputs[id]);
   const source = data.blockType === CSV_SOURCE;
   const Icon = ICONS[data.template?.icon || data.blockType] || ICONS[data.blockType] || Box;
-  const tone = nodeTone(data.blockType, data.template?.color);
+  const tone = source ? 'green' : nodeTone(data.blockType, data.template?.color);
   return (
     <div className={`scientific-node node-${tone} ${selected ? 'active' : ''}`}>
       {!source && (
@@ -91,7 +91,9 @@ function ScientificNodeBase({ id, data, selected }: NodeProps<ScientificFlowNode
         </div>
       )}
       <div className="node-description">
-        {TYPE_DESCRIPTIONS[data.blockType] || data.template?.label}
+        {data.config.dtype === 'string'
+          ? 'UTF-8 text data'
+          : TYPE_DESCRIPTIONS[data.blockType] || data.template?.label}
       </div>
       {(data.template?.kind === 'dataset' || data.blockType === 'dataset') && (
         <div className="node-target">

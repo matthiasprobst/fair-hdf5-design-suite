@@ -86,7 +86,12 @@ class DataNodeTests(CatalogTestCase):
 
     def test_source_settings_are_not_arbitrary_metadata(self):
         design = data_design()
-        for config in [{"delimiter": ",", "decimal_separator": ","}, {"content": "secret"}]:
+        for config in [
+            {"delimiter": ",", "decimal_separator": ","},
+            {"content": "secret"},
+            {"delimiter": [";"]},
+            {"decimal_separator": []},
+        ]:
             bad = copy.deepcopy(design)
             bad["nodes"][0]["config"] = config
             with self.assertRaises(DesignError):

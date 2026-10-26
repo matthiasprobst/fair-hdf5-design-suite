@@ -82,7 +82,8 @@ def parse_csv(content, config, settings, source="CSV", cell_limit=None):
             line = previous_line + 1
             previous_line = reader.line_num
             if not row:
-                continue
+                # A blank record is an empty cell, not permission to drop a measurement.
+                row = [""]
             if columns is None:
                 columns = (
                     row if options["has_header"] else [f"Column {i + 1}" for i in range(len(row))]
@@ -130,6 +131,9 @@ def convert_column(table, index, dtype, source, path):
                     value = float(parsed)
                     if not np.isfinite(value) or abs(value) > float(np.finfo(target).max):
                         raise ValueError("number exceeds the target datatype range")
+                    with np.errstate(under="ignore"):
+                        if parsed != 0 and target.type(value) == 0:
+                            raise ValueError("number underflows the target datatype range")
             values.append(value)
         except (ValueError, OverflowError) as exc:
             raise DesignError(

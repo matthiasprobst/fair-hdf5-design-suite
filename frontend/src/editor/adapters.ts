@@ -24,6 +24,7 @@ export type Graph = {
   edges: ScientificFlowEdge[];
 };
 const relationColor: Record<string, string> = {
+  provides_data: '#16845e',
   instrumented_by: '#2777e9',
   acquired_by: '#2579e6',
   processed_by: '#e9a01e',

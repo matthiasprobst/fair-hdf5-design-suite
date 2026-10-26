@@ -9,11 +9,28 @@ A research prototype for visually designing experiment workflows and HDF5 target
 - Build experiment workflows from equipment, sensor, processing, metadata, HDF5 group, and dataset blocks.
 - Configure metadata and HDF5 paths, datatypes, and shapes.
 - Preview the target HDF5 structure and generate HDF5 templates and SHACL constraints.
+- Import CSV columns through data-source nodes and build populated HDF5 files with numeric and UTF-8 text datasets.
 - Validate generated templates or uploaded HDF5 files against the selected design.
 - Manage private projects and share them with selected viewers or editors.
 - Import and export portable blueprint JSON; projects are saved on the server with browser recovery for unsaved edits.
 
 Workflow connections describe experimental relationships. HDF5 paths describe the physical file hierarchy; the two are modeled separately.
+
+## Build HDF5 with CSV data
+
+1. Open a project, choose **Edit project**, and add **CSV Source** from **Data inputs**.
+2. Set the delimiter, decimal separator, and header option, then select a UTF-8 CSV file. The inspector shows column types and previews the first 50 rows.
+3. Select columns and choose **Create datasets from selected columns**. Alternatively, connect the source's square output to an existing Dataset node's square input, then select its column in the inspector. Round ports continue to describe experimental relationships.
+4. Configure each dataset's path, datatype, metadata, and unit. Each column becomes a one-dimensional dataset. Shape `0` uses the CSV row count; a fixed shape must match exactly. `string` creates variable-length UTF-8 text datasets. Suggested datatypes are editable; use `string` for identifiers whose leading zeros must be preserved.
+5. In **Generated Artifacts**, choose **Build HDF5 with data**. Every Dataset node must be connected to a CSV column, and all connected sources must have files loaded. **Download template .h5** remains available independently and generates the designed datasets without importing CSV values.
+
+Try [the example CSV](examples/csv/measurements.csv) with **Semicolon**, decimal **Comma**, and headers enabled. It produces `/data/time`, `/data/pressure`, and `/data/sample`. Configure suitable units (for example `s`, `Pa`, and `1`) before validating its metadata.
+
+Files and preview rows are kept only in memory for the open project. Selecting a file sends it to the server for request-only parsing; the server does not retain it. Project saves, recovery drafts, copies, and blueprint exports contain source settings, filenames, expected headers, and mappings, **not CSV contents**. Reselect files after reopening or importing a blueprint. Viewers can load their own files for existing mappings and export without editing the project. Changed headers require an editor's explicit acceptance; bindings retain their column positions.
+
+CSV import supports UTF-8 (including BOM), comma/semicolon/tab delimiters, an optional header row, quoted fields, and dot/comma decimal separators. The delimiter and decimal separator must differ. Duplicate headers are distinguished by column position. Empty text cells are preserved; empty or invalid numeric cells, fractional integers, overflow, and nonfinite values stop the build with a source/row/column/target error. Rows are never silently dropped.
+
+The default limits are 30 MB of combined CSV input, 50,000 rows per source, two million parsed cells (including headers), two million total populated values, and 30 MB of generated value payload. Existing `FAIR_HDF5_MAX_UPLOAD_BYTES`, `FAIR_HDF5_MAX_DIMENSION_SIZE`, and `FAIR_HDF5_MAX_DATASET_ELEMENTS` settings control these limits; the HDF5 container and embedded blueprint add file overhead. Populated files can be checked with the existing uploaded-HDF5 validation action. Validation checks structure and metadata, not equality with the CSV values. Transformations, matrix/compound datasets, and persistent uploads are not included.
 
 ## Project status and scope
 

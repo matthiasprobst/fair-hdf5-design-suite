@@ -1,5 +1,7 @@
 """Built-in input nodes and data bindings, independent of SHACL templates."""
 
+from copy import deepcopy
+
 from .errors import DesignError
 
 CSV_SOURCE = "csv_source"
@@ -16,9 +18,11 @@ CSV_DEFAULTS = {
 def validate_source(config):
     if not isinstance(config, dict) or set(config) - CSV_DEFAULTS.keys():
         raise DesignError("Unsupported CSV source configuration.")
-    options = {**CSV_DEFAULTS, **config}
+    options = {**deepcopy(CSV_DEFAULTS), **deepcopy(config)}
     if (
-        options["delimiter"] not in {",", ";", "\t"}
+        not isinstance(options["delimiter"], str)
+        or options["delimiter"] not in {",", ";", "\t"}
+        or not isinstance(options["decimal_separator"], str)
         or options["decimal_separator"] not in {".", ","}
         or options["delimiter"] == options["decimal_separator"]
         or type(options["has_header"]) is not bool

@@ -16,6 +16,7 @@ import unittest
 from pathlib import Path
 from uuid import uuid4
 
+import h5py
 from fair_hdf5.catalog import CATALOG, demo
 from playwright.sync_api import expect, sync_playwright
 from ui_support import create_project, sign_in
@@ -342,6 +343,100 @@ class EditorBrowserTests(unittest.TestCase):
             self.assertAlmostEqual(pos["x"], n["x"], delta=0.01)
             self.assertAlmostEqual(pos["y"], n["y"], delta=0.01)
         self.page.screenshot(path=str(OUT / "after-reload.png"), full_page=True)
+
+    def test_csv_sources_populate_hdf5_and_require_reselection(self):
+        self.load({"name": "CSV measurements", "version": "0.1", "nodes": [], "edges": []})
+        self.page.locator(".palette-item").filter(has_text="CSV Source").hover()
+        self.page.get_by_role("button", name="Add CSV Source", exact=True).click()
+        self.graph_visible(1)
+        self.page.get_by_label("Delimiter", exact=True).select_option(";")
+        self.page.get_by_label("Decimal separator", exact=True).select_option(",")
+        csv_file = {
+            "name": "measurements.csv",
+            "mimeType": "text/csv",
+            "buffer": "time;pressure;sample\n0;1,25;München\n1;2,5;東京\n".encode(),
+        }
+        self.page.get_by_label("CSV file (UTF-8)", exact=True).set_input_files(csv_file)
+        expect(self.page.locator(".csv-summary")).to_contain_text("2 rows · 3 columns")
+        expect(self.page.locator(".csv-table")).to_contain_text("München")
+        self.page.get_by_role(
+            "button", name="Create datasets from selected columns", exact=True
+        ).click()
+        self.graph_visible(4)
+        expect(self.page.locator(".react-flow__edge")).to_have_count(3)
+        self.wait_saved()
+        saved = self.stored()
+        source_id = next(n["id"] for n in saved["nodes"] if n["type"] == "csv_source")
+        self.assertEqual(len([e for e in saved["edges"] if e.get("kind") == "data"]), 3)
+        self.assertNotIn("München", json.dumps(saved, ensure_ascii=False))
+        self.assertNotIn("東京", json.dumps(saved, ensure_ascii=False))
+        expect(
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True)
+        ).to_be_enabled()
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True).click()
+        with h5py.File(transfer.value.path(), "r") as handle:
+            self.assertEqual(handle["/data/time"][:].tolist(), [0, 1])
+            self.assertEqual(handle["/data/pressure"][:].tolist(), [1.25, 2.5])
+            self.assertEqual(handle["/data/sample"].asstr()[:].tolist(), ["München", "東京"])
+        self.page.get_by_role("button", name="Finish editing", exact=True).click()
+        expect(self.page.get_by_role("button", name="Edit project", exact=True)).to_be_visible()
+        self.page.reload()
+        self.graph_visible(4)
+        self.node(source_id).locator(".node-title").click()
+        expect(
+            self.page.get_by_text("measurements.csv · Select file again", exact=True)
+        ).to_be_visible()
+        expect(
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True)
+        ).to_be_disabled()
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Download template .h5", exact=True).click()
+        with h5py.File(transfer.value.path(), "r") as handle:
+            self.assertEqual(handle["/data/pressure"].shape, (0,))
+            self.assertEqual(
+                h5py.check_string_dtype(handle["/data/sample"].dtype).encoding, "utf-8"
+            )
+        saved = self.stored()
+        self.page.get_by_label("CSV file (UTF-8)", exact=True).set_input_files(csv_file)
+        expect(
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True)
+        ).to_be_enabled()
+        self.assertEqual(self.stored(), saved, "Session file selection must not save the project")
+        self.assertTrue(self.page.get_by_label("Delimiter", exact=True).is_disabled())
+        self.page.get_by_title("Fit to view", exact=True).click()
+        self.settled_viewport()
+        self.page.locator(".csv-table-wrap").scroll_into_view_if_needed()
+        self.page.screenshot(path=str(OUT / "csv-data-nodes-desktop.png"), full_page=True)
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True).click()
+        with h5py.File(transfer.value.path(), "r") as handle:
+            self.assertEqual(handle["/data/sample"].asstr()[:].tolist(), ["München", "東京"])
+        # A bad numeric cell produces a precise error instead of downloading placeholders.
+        self.page.get_by_label("CSV file (UTF-8)", exact=True).set_input_files(
+            {
+                **csv_file,
+                "buffer": "time;pressure;sample\n0;oops;München\n".encode(),
+            }
+        )
+        expect(self.page.locator(".csv-summary")).to_contain_text("1 rows")
+        self.expected_http_statuses.add(422)
+        self.page.get_by_role("button", name="Build HDF5 with data", exact=True).click()
+        expect(self.page.locator(".artifact-data-export [role=alert]")).to_contain_text(
+            "row 2, column 2"
+        )
+        expect(self.page.locator(".artifact-data-export [role=alert]")).to_contain_text(
+            "/data/pressure"
+        )
+        # Check the inspector at a narrow viewport without page-wide overflow.
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.get_by_title("Fit to view", exact=True).click()
+        self.settled_viewport()
+        self.page.get_by_role("button", name="Toggle inspector", exact=True).click()
+        expect(self.page.get_by_label("CSV file (UTF-8)", exact=True)).to_be_visible()
+        self.page.locator(".csv-table-wrap").scroll_into_view_if_needed()
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 390)
+        self.page.screenshot(path=str(OUT / "csv-data-nodes-mobile.png"), full_page=True)
 
     def test_validation_survives_layout_but_not_metadata(self):
         self.load()

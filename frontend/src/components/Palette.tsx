@@ -29,7 +29,7 @@ const descriptions: Record<string, string> = {
   daq: 'Data acquisition',
   process: 'Write to HDF5',
   group: 'Group or container',
-  dataset: 'Numerical variable',
+  dataset: 'Numeric or text variable',
   csv_source: 'CSV columns → HDF5 datasets',
   metadata: 'Experimental context',
 };

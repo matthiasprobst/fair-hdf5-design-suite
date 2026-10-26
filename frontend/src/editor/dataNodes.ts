@@ -22,8 +22,10 @@ export function sourceConfig(config: Config): Config {
   const value = { ...structuredClone(csvSource.defaults), ...config };
   if (
     Object.keys(config).some((key) => !(key in csvSource.defaults)) ||
-    ![',', ';', '\t'].includes(String(value.delimiter)) ||
-    !['.', ','].includes(String(value.decimal_separator)) ||
+    typeof value.delimiter !== 'string' ||
+    ![',', ';', '\t'].includes(value.delimiter) ||
+    typeof value.decimal_separator !== 'string' ||
+    !['.', ','].includes(value.decimal_separator) ||
     value.delimiter === value.decimal_separator ||
     typeof value.has_header !== 'boolean' ||
     typeof value.filename !== 'string' ||

@@ -50,6 +50,8 @@ class SettingsTests(CatalogTestCase):
                 "max_edges": 1000,
                 "max_upload_bytes": 30_000_000,
                 "shacl_engine": "pyshacl",
+                "max_dimension_size": 50_000,
+                "max_dataset_elements": 2_000_000,
             },
         )
 

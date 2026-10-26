@@ -74,3 +74,9 @@ ruff format --check .
 
 From this directory, use `python -m unittest discover -s tests -v` instead.
 Full-app Playwright checks remain in the root `tests/` directory.
+
+## CSV inputs
+
+Built-in `csv_source` nodes are operational inputs rather than SHACL templates. Their scalar configuration contains `delimiter`, `decimal_separator`, `has_header`, `filename`, and a string-array `columns` manifest. Data edges carry `kind: "data"`, `column_index`, and `relation: "provides_data"`; each connects a source to a single Dataset node. Legacy edges omit `kind`.
+
+Authenticated, CSRF-protected `POST /api/data/csv/preview` accepts multipart `settings_json` and `file`, returning `columns`, `row_count`, `suggested_dtypes`, and at most 50 preview `rows`. `POST /api/export/hdf5/data` accepts multipart `design_json` plus one file field named for each connected source-node ID, returning an HDF5 attachment. Uploads are closed at request completion and are not persisted. `csv_data.py` owns parsing and checked conversions; `DesignService` owns input resolution and export orchestration. Existing template/SHACL APIs do not require source files.

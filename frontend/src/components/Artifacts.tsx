@@ -163,8 +163,6 @@ export default function Artifacts({
             <button disabled={pending} onClick={onHdf5Download}>
               <Download size={14} /> Download template .h5
             </button>
-          </div>
-          <div className="artifact-data-export">
             <button
               disabled={pending || dataBuilding || dataIssues.length > 0}
               onClick={onDataDownload}
@@ -172,6 +170,8 @@ export default function Artifacts({
               <Download size={14} />
               {dataBuilding ? 'Building HDF5…' : 'Build HDF5 with data'}
             </button>
+          </div>
+          <div className="artifact-data-export">
             {dataIssues.length ? (
               <p>
                 {dataIssues.slice(0, 3).join(' ')}
