@@ -40,6 +40,7 @@ export function EditorView() {
     };
   }, [setDialog, runValidation]);
   const artifactState = useStore(artifacts.store);
+  const csvState = useStore(session.csv.store);
   const preview = artifactState.preview.status === 'current' ? artifactState.preview.data : null;
   const validation =
     artifactState.validation.status === 'current' ? artifactState.validation.data : null;
@@ -173,6 +174,10 @@ export function EditorView() {
               onShaclDownload={commands.exportShacl}
               onStructure={commands.previewStructure}
               onHdf5Download={commands.exportHdf5}
+              onDataDownload={commands.exportData}
+              dataIssues={session.csv.issues()}
+              dataError={csvState.error}
+              dataBuilding={csvState.building}
               onValidation={() => commands.runValidation()}
               onReport={() => commands.setDialog('validation')}
             />

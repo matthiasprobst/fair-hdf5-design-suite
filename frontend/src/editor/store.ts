@@ -15,6 +15,7 @@ import type {
   NodeType,
 } from '../types';
 import { makeId, suggestedRelation, uniquePath } from '../editor/rules';
+import { CSV_SOURCE, csvSource } from './dataNodes';
 import { fromBlueprint, fromEdge, fromNode, toBlueprint, toEdge, toNode } from './adapters';
 import type { Graph, ScientificFlowEdge, ScientificFlowNode } from './adapters';
 
@@ -42,6 +43,11 @@ export interface EditorState extends Graph {
   duplicateNode: (id: string) => void;
   updateNode: (id: string, patch: { label?: string; config?: Config }) => void;
   updateEdge: (id: string, relation: string) => void;
+  mapColumn: (id: string, index: number) => void;
+  createDatasets: (
+    source: string,
+    columns: { index: number; name: string; dtype: string }[],
+  ) => void;
   isValidConnection: (connection: Connection | ScientificFlowEdge) => boolean;
   connect: (connection: Connection) => void;
 }
@@ -250,7 +256,7 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
       })),
     addNode: (type, x, y) =>
       set((s) => {
-        const info = s.catalog[type];
+        const info = type === CSV_SOURCE ? csvSource : s.catalog[type];
         if (
           !info ||
           !s.capabilities ||
@@ -323,7 +329,7 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
     updateEdge: (id, relation) =>
       set((s) => {
         const edge = s.edges.find((e) => e.id === id);
-        if (!edge || edge.data?.relation === relation) return s;
+        if (!edge || edge.data?.kind === 'data' || edge.data?.relation === relation) return s;
         return {
           edges: s.edges.map((e) =>
             e === edge
@@ -333,17 +339,103 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
           ...changed(s),
         };
       }),
+    mapColumn: (id, index) =>
+      set((s) => {
+        const edge = s.edges.find((e) => e.id === id && e.data?.kind === 'data');
+        if (!edge || !Number.isInteger(index) || index < 0 || edge.data?.column_index === index)
+          return s;
+        return {
+          edges: s.edges.map((e) =>
+            e === edge ? { ...e, ...fromEdge({ ...toEdge(e), column_index: index }) } : e,
+          ),
+          ...changed(s),
+        };
+      }),
+    createDatasets: (source, columns) =>
+      set((s) => {
+        const input = s.nodes.find((n) => n.id === source && n.data.blockType === CSV_SOURCE);
+        const info = s.catalog.dataset;
+        if (
+          !input ||
+          !info ||
+          !s.capabilities ||
+          !columns.length ||
+          s.nodes.length + columns.length > s.capabilities.max_nodes ||
+          s.edges.length + columns.length > s.capabilities.max_edges
+        )
+          return s;
+        const nodes = [...s.nodes],
+          edges = [...s.edges];
+        for (const [offset, column] of columns.entries()) {
+          if (
+            !Number.isInteger(column.index) ||
+            column.index < 0 ||
+            !['int64', 'float64', 'string'].includes(column.dtype)
+          )
+            return s;
+          const id = makeId('dataset', new Set(nodes.map((n) => n.id)));
+          const name = column.name.trim() || `column_${column.index + 1}`;
+          const slug =
+            name.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 80) || `column_${column.index + 1}`;
+          const config = {
+            ...structuredClone(info.defaults),
+            path: uniquePath(`/data/${slug}`, toBlueprint({ ...s, nodes })),
+            dtype: column.dtype,
+            shape: '0',
+            quantity: name,
+            unit: '',
+          };
+          nodes.push(
+            fromNode({
+              id,
+              type: 'dataset',
+              label: name,
+              x: input.position.x + 320,
+              y: input.position.y + offset * 210,
+              config,
+              ...(isTemplateSnapshot(info) ? { template: structuredClone(info) } : {}),
+            }),
+          );
+          edges.push(
+            fromEdge({
+              id: makeId('data', new Set(edges.map((e) => e.id))),
+              source,
+              target: id,
+              relation: 'provides_data',
+              kind: 'data',
+              column_index: column.index,
+            }),
+          );
+        }
+        return { nodes, edges, ...changed(s) };
+      }),
     isValidConnection: (c) => {
       const s = get();
+      const source = s.nodes.find((n) => n.id === c.source);
+      const target = s.nodes.find((n) => n.id === c.target);
+      const data = c.sourceHandle === 'data-out' && c.targetHandle === 'data-in';
       return (
         c.source !== c.target &&
-        c.sourceHandle === 'out' &&
-        c.targetHandle === 'in' &&
+        (data
+          ? source?.data.blockType === CSV_SOURCE &&
+            (target?.data.template || s.catalog[target?.data.blockType || ''])?.kind ===
+              'dataset' &&
+            !s.edges.some((e) => e.target === c.target && e.data?.kind === 'data')
+          : c.sourceHandle === 'out' &&
+            c.targetHandle === 'in' &&
+            source?.data.blockType !== CSV_SOURCE &&
+            target?.data.blockType !== CSV_SOURCE) &&
         !!s.capabilities &&
         s.edges.length < s.capabilities.max_edges &&
         s.nodes.some((n) => n.id === c.source) &&
         s.nodes.some((n) => n.id === c.target) &&
-        !s.edges.some((e) => e.source === c.source && e.target === c.target && !e.data?.predicate)
+        !s.edges.some(
+          (e) =>
+            e.source === c.source &&
+            e.target === c.target &&
+            !e.data?.predicate &&
+            (e.data?.kind === 'data') === data,
+        )
       );
     },
     connect: (c) => {
@@ -356,6 +448,9 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
           source: a.id,
           target: b.id,
           relation: suggestedRelation(a.data.blockType, b.data.blockType),
+          ...(c.sourceHandle === 'data-out'
+            ? { kind: 'data', column_index: 0, relation: 'provides_data' }
+            : {}),
         });
         return { edges: [...s.edges, edge], ...changed(s) };
       });
@@ -374,6 +469,8 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
     duplicateNode: guard(actions.duplicateNode),
     updateNode: guard(actions.updateNode),
     updateEdge: guard(actions.updateEdge),
+    mapColumn: guard(actions.mapColumn),
+    createDatasets: guard(actions.createDatasets),
     connect: guard(actions.connect),
     deleteElements: guard(actions.deleteElements),
     linkNode: guard(actions.linkNode),

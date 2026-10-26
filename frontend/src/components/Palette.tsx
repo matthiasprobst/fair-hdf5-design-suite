@@ -13,14 +13,24 @@ import type { Catalog, NodeType } from '../types';
 import LibraryEditor from './LibraryEditor';
 import { CATEGORY_ICONS, ICONS } from '../lib/ui';
 import { useCanEdit } from '../projects/EditorSessionContext';
+import { CSV_SOURCE, csvSource } from '../editor/dataNodes';
 
-const order = ['Experiment', 'Sensor', 'Equipment', 'Process', 'HDF5 structure', 'Metadata'];
+const order = [
+  'Data inputs',
+  'Experiment',
+  'Sensor',
+  'Equipment',
+  'Process',
+  'HDF5 structure',
+  'Metadata',
+];
 const descriptions: Record<string, string> = {
   fan: 'Fan, pump, physical system',
   daq: 'Data acquisition',
   process: 'Write to HDF5',
   group: 'Group or container',
   dataset: 'Numerical variable',
+  csv_source: 'CSV columns → HDF5 datasets',
   metadata: 'Experimental context',
 };
 interface Props {
@@ -33,25 +43,24 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<string[]>([]);
-  const groups = useMemo(
-    () =>
-      [
-        ...order,
-        ...Array.from(new Set(Object.values(catalog).map((i) => i.category))).filter(
-          (c) => !order.includes(c),
+  const groups = useMemo(() => {
+    const blocks = { ...catalog, [CSV_SOURCE]: csvSource };
+    return [
+      ...order,
+      ...Array.from(new Set(Object.values(blocks).map((i) => i.category))).filter(
+        (c) => !order.includes(c),
+      ),
+    ]
+      .map((category) => ({
+        category,
+        items: Object.entries(blocks).filter(
+          ([key, info]) =>
+            info.category.toLowerCase() === category.toLowerCase() &&
+            `${info.label} ${key}`.toLowerCase().includes(search.toLowerCase()),
         ),
-      ]
-        .map((category) => ({
-          category,
-          items: Object.entries(catalog).filter(
-            ([key, info]) =>
-              info.category.toLowerCase() === category.toLowerCase() &&
-              `${info.label} ${key}`.toLowerCase().includes(search.toLowerCase()),
-          ),
-        }))
-        .filter((g) => g.items.length),
-    [catalog, search],
-  );
+      }))
+      .filter((g) => g.items.length);
+  }, [catalog, search]);
   return (
     <aside className="palette panel-shell">
       <div className="palette-header">
@@ -129,14 +138,16 @@ export default function Palette({ catalog, onAdd, onClose }: Props) {
                         <span>{info.label}</span>
                         {descriptions[type] && <small>{descriptions[type]}</small>}
                       </div>
-                      <button
-                        className="icon-button"
-                        disabled={!canEdit}
-                        aria-label={`${info.project_local ? 'Edit template' : 'Copy template'} ${info.label}`}
-                        onClick={() => setEditing(type)}
-                      >
-                        ✎
-                      </button>
+                      {type !== CSV_SOURCE && (
+                        <button
+                          className="icon-button"
+                          disabled={!canEdit}
+                          aria-label={`${info.project_local ? 'Edit template' : 'Copy template'} ${info.label}`}
+                          onClick={() => setEditing(type)}
+                        >
+                          ✎
+                        </button>
+                      )}
                       <GripVertical className="palette-grip" size={13} />
                       <button
                         className="palette-add"

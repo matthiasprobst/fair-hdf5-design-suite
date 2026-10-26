@@ -1668,3 +1668,167 @@
     margin-bottom: 8px;
   }
 }
+/* CSV inputs share the inspector, while their square ports identify executable data. */
+.react-flow__handle.data-handle {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: #16845e;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #16845e;
+}
+.csv-inspector .technical-note {
+  margin-top: 0;
+}
+.csv-inspector .inspector-profile-card p {
+  margin: 5px 0 0;
+  font-size: 11px;
+  color: #60718a;
+}
+.csv-settings,
+.csv-columns {
+  min-width: 0;
+  border: 1px solid #dce5ed;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0;
+}
+.csv-settings legend,
+.csv-columns legend {
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.csv-settings .form-field {
+  margin-bottom: 12px;
+}
+.csv-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.csv-checkbox input {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+.csv-checkbox small {
+  margin-left: auto;
+  color: #60718a;
+}
+.csv-columns p,
+.csv-header-review p,
+.csv-summary,
+.csv-binding p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 9px;
+}
+.csv-columns .csv-checkbox {
+  margin-bottom: 9px;
+}
+.csv-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.csv-file-actions button,
+.csv-columns button,
+.csv-header-review button,
+.csv-binding button,
+.artifact-data-export button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cddbd5;
+  border-radius: 6px;
+  background: #f3faf6;
+  color: #23694d;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.csv-file-actions button:disabled,
+.csv-columns button:disabled,
+.csv-binding button:disabled,
+.artifact-data-export button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.csv-header-review {
+  background: #fff8e9;
+  border: 1px solid #efd5a2;
+  border-radius: 8px;
+  padding: 11px;
+}
+.csv-table-wrap {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #dce5ed;
+  border-radius: 8px;
+}
+.csv-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.csv-table th,
+.csv-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e4eaf0;
+  white-space: pre-wrap;
+  min-width: 100px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+.csv-table th {
+  background: #f3f7fa;
+  position: sticky;
+  top: 0;
+}
+.csv-table th small {
+  display: block;
+  font-weight: 400;
+  color: #60718a;
+  margin-top: 4px;
+}
+.csv-binding {
+  border-top: 1px solid #dce5ed;
+  border-bottom: 1px solid #dce5ed;
+  padding: 14px 0;
+  display: grid;
+  gap: 9px;
+}
+.csv-binding > strong {
+  font-size: 13px;
+}
+.csv-binding > small,
+.csv-limits {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #60718a;
+}
+.csv-inspector input[type='file'] {
+  width: 100%;
+  font-size: 12px;
+  padding: 8px;
+}
+.artifact-data-export {
+  padding-top: 10px;
+  margin-top: 8px;
+  border-top: 1px solid #e4eaf0;
+}
+.artifact-data-export p {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #60718a;
+}
+.artifact-data-export .form-error {
+  color: #ab283d;
+}

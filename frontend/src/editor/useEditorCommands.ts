@@ -11,7 +11,7 @@ import { useProjectSession } from '../projects/EditorSessionContext';
 /** Editor operations and their cancellation lifecycle, independent of panel layout. */
 export function useEditorCommands(recoveryRaw: string | null) {
   const editorStore = useEditorStore();
-  const { artifacts } = useProjectSession();
+  const { artifacts, csv } = useProjectSession();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState('');
@@ -63,6 +63,11 @@ export function useEditorCommands(recoveryRaw: string | null) {
     void execute('hdf5', async () => {
       const blob = await artifacts.hdf5();
       if (blob) download(blob, 'experiment-template.h5');
+    });
+  const exportData = () =>
+    void execute('data', async (signal) => {
+      const blob = await csv.build(signal);
+      if (blob && !signal.aborted) download(blob, 'experiment-data.h5');
     });
   const exportShacl = () =>
     void execute('shacl', async () => {
@@ -157,6 +162,7 @@ export function useEditorCommands(recoveryRaw: string | null) {
     onSaveJson,
     exportRecovery,
     exportHdf5,
+    exportData,
     exportShacl,
     previewShacl,
     previewStructure,

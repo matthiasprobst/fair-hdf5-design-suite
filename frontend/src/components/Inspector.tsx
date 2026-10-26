@@ -34,6 +34,7 @@ interface Props {
   onUpgrade: (id: string, template: CatalogItem) => Promise<void>;
   upgrading: boolean;
   referenceFields: ReactNode;
+  dataFields?: ReactNode;
   readOnly: boolean;
   onClose: () => void;
   onNotice: (text: string, error?: boolean) => void;
@@ -52,6 +53,7 @@ export default function Inspector({
   onUpgrade,
   upgrading,
   referenceFields,
+  dataFields,
   readOnly,
 }: Props) {
   const [upgradePreview, setUpgradePreview] = useState(false);
@@ -295,12 +297,12 @@ export default function Inspector({
         {info.kind === 'dataset' && (
           <div className="dataset-settings">
             <div className="form-field">
-              <label>Numeric data type</label>
+              <label>Dataset data type</label>
               <select
                 value={value('dtype') || 'float64'}
                 onChange={(e) => update('dtype', e.target.value)}
               >
-                {['float64', 'float32', 'int64', 'int32', 'uint16', 'uint8'].map((x) => (
+                {['float64', 'float32', 'int64', 'int32', 'uint16', 'uint8', 'string'].map((x) => (
                   <option key={x}>{x}</option>
                 ))}
               </select>
@@ -315,6 +317,7 @@ export default function Inspector({
             </div>
           </div>
         )}
+        {dataFields}
         <div className="inspector-section-title">
           <ClipboardList size={15} /> Required metadata <span>{req.length}</span>
         </div>

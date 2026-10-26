@@ -27,6 +27,10 @@ type Props = {
   onShaclDownload: () => void;
   onStructure: () => void;
   onHdf5Download: () => void;
+  onDataDownload: () => void;
+  dataIssues: string[];
+  dataError: string;
+  dataBuilding: boolean;
   onValidation: () => void;
   onReport: () => void;
   onRefresh: () => void;
@@ -42,6 +46,10 @@ export default function Artifacts({
   onShaclDownload,
   onStructure,
   onHdf5Download,
+  onDataDownload,
+  dataIssues,
+  dataError,
+  dataBuilding,
   onValidation,
   onReport,
   onRefresh,
@@ -128,7 +136,7 @@ export default function Artifacts({
             </span>
             <div>
               <strong>HDF5 Template</strong>
-              <p>File hierarchy, prefabricated metadata and empty numerical datasets.</p>
+              <p>File hierarchy, metadata, and datasets. Build a populated file from CSV inputs.</p>
             </div>
             <span className="artifact-status">
               {previewLabel} {previewStatus === 'current' && <Check size={12} />}
@@ -153,8 +161,30 @@ export default function Artifacts({
               <GitBranch size={14} /> Preview structure
             </button>
             <button disabled={pending} onClick={onHdf5Download}>
-              <Download size={14} /> Download .h5
+              <Download size={14} /> Download template .h5
             </button>
+          </div>
+          <div className="artifact-data-export">
+            <button
+              disabled={pending || dataBuilding || dataIssues.length > 0}
+              onClick={onDataDownload}
+            >
+              <Download size={14} />
+              {dataBuilding ? 'Building HDF5…' : 'Build HDF5 with data'}
+            </button>
+            {dataIssues.length ? (
+              <p>
+                {dataIssues.slice(0, 3).join(' ')}
+                {dataIssues.length > 3 ? ` (+${dataIssues.length - 3} more)` : ''}
+              </p>
+            ) : (
+              <p>Every dataset has a source. Values are checked when building.</p>
+            )}
+            {dataError && (
+              <p className="form-error" role="alert">
+                {dataError}
+              </p>
+            )}
           </div>
         </article>
         <article className="artifact-card artifact-validation">

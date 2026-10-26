@@ -4,6 +4,8 @@ export type Capabilities = {
   max_nodes: number;
   max_edges: number;
   max_upload_bytes: number;
+  max_dimension_size?: number;
+  max_dataset_elements?: number;
   shacl_engine: 'pyshacl' | 'subset';
 };
 
@@ -14,6 +16,13 @@ export function parseCapabilities(value: unknown): Capabilities {
   for (const key of ['max_nodes', 'max_edges', 'max_upload_bytes']) {
     if (typeof data[key] !== 'number' || !Number.isSafeInteger(data[key]) || data[key] <= 0)
       throw new Error('Backend returned invalid limits. Retry connection.');
+  }
+  for (const key of ['max_dimension_size', 'max_dataset_elements']) {
+    if (
+      data[key] !== undefined &&
+      (typeof data[key] !== 'number' || !Number.isSafeInteger(data[key]) || data[key] <= 0)
+    )
+      throw new Error('Backend returned invalid data limits. Retry connection.');
   }
   if (data.shacl_engine !== 'pyshacl' && data.shacl_engine !== 'subset')
     throw new Error('Backend returned an unknown validation engine.');

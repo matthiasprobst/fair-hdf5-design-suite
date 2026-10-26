@@ -13,6 +13,7 @@ import { useEditorStore } from '../context';
 import { jsonFile } from '../../lib/downloads';
 import { toBlueprint } from '../adapters';
 import { CanvasHeading } from './CanvasHeading';
+import { CSV_SOURCE } from '../dataNodes';
 
 type Props = {
   artifacts: (onClose: () => void) => ReactNode;
@@ -49,7 +50,7 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
       const type =
         event.dataTransfer.getData('application/x-fair-component') ||
         event.dataTransfer.getData('text/plain');
-      if (!Object.prototype.hasOwnProperty.call(catalog, type)) return;
+      if (type !== CSV_SOURCE && !Object.prototype.hasOwnProperty.call(catalog, type)) return;
       const position = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
       addNode(type as NodeType, position.x - 95, position.y - 38);
     },
@@ -100,8 +101,7 @@ export function EditorWorkspace({ artifacts, onNotice, previewStructure }: Props
               <Canvas showMinimap={showMinimap} onSelection={showInspector} />
             </CanvasErrorBoundary>
             <div className="canvas-corner-note">
-              <SlidersHorizontal size={13} /> Connect blocks using the round ports · Drag blocks
-              from library
+              <SlidersHorizontal size={13} /> Round ports: relationships · Square ports: CSV data
             </div>
           </div>
         </section>

@@ -124,3 +124,30 @@ export function parseValidation(value: unknown): ValidationResult {
     return invalid('validation');
   return value as unknown as ValidationResult;
 }
+import type { CsvPreview } from '../types';
+
+export function parseCsvPreview(value: unknown): CsvPreview {
+  if (!value || typeof value !== 'object') throw new Error('Invalid CSV preview.');
+  const data = value as Record<string, unknown>;
+  if (
+    !Array.isArray(data.columns) ||
+    !data.columns.every((c) => typeof c === 'string') ||
+    typeof data.row_count !== 'number' ||
+    !Number.isSafeInteger(data.row_count) ||
+    data.row_count < 0 ||
+    !Array.isArray(data.suggested_dtypes) ||
+    data.suggested_dtypes.length !== data.columns.length ||
+    !data.suggested_dtypes.every((d) => ['int64', 'float64', 'string'].includes(String(d))) ||
+    !Array.isArray(data.rows) ||
+    data.rows.length > 50 ||
+    data.rows.length > data.row_count ||
+    !data.rows.every(
+      (r) =>
+        Array.isArray(r) &&
+        r.length === (data.columns as unknown[]).length &&
+        r.every((c) => typeof c === 'string'),
+    )
+  )
+    throw new Error('Invalid CSV preview.');
+  return data as unknown as CsvPreview;
+}

@@ -1,5 +1,6 @@
 import { parseCapabilities } from '../editor/limits';
-import type { Blueprint, ProfileDocument } from '../types';
+import type { Blueprint, ProfileDocument, Config } from '../types';
+import { parseCsvPreview } from './contracts';
 import { parseCatalog, parsePreview, parseProfileAnalysis, parseValidation } from './contracts';
 import { request } from './http';
 
@@ -23,6 +24,20 @@ async function postJson<T>(
   return parse(await (await post(url, body, signal)).json());
 }
 export const api = {
+  csvPreview: async (file: File, config: Config, signal?: AbortSignal) => {
+    const body = new FormData();
+    body.append('settings_json', JSON.stringify(config));
+    body.append('file', file);
+    return parseCsvPreview(
+      await (await request('/api/data/csv/preview', { method: 'POST', body, signal })).json(),
+    );
+  },
+  hdf5Data: async (design: Blueprint, files: Record<string, File>, signal?: AbortSignal) => {
+    const body = new FormData();
+    body.append('design_json', JSON.stringify(design));
+    for (const [id, file] of Object.entries(files)) body.append(id, file);
+    return (await request('/api/export/hdf5/data', { method: 'POST', body, signal })).blob();
+  },
   analyzeProfile: (
     ttl: string,
     documents: Record<string, ProfileDocument> = {},

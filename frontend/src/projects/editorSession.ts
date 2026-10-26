@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla';
 import { createEditorStore } from '../editor/store';
 import { createArtifacts } from '../editor/artifacts';
+import { createCsvSession } from '../editor/csvSession';
 import { parseBlueprint, toBlueprint } from '../editor/adapters';
 import type { Capabilities } from '../editor/limits';
 import type { Blueprint, Catalog, TemplateDraft, TemplateSnapshot } from '../types';
@@ -29,6 +30,7 @@ export class ProjectEditorSession {
   readonly state;
   readonly graph;
   readonly artifacts;
+  readonly csv;
   private token: string | null = null;
   private expires = 0;
   private queue: Promise<void> = Promise.resolve();
@@ -66,6 +68,7 @@ export class ProjectEditorSession {
     this.graph.getState().setCapabilities(capabilities);
     this.graph.getState().hydrate(project.blueprint, catalog);
     this.artifacts = createArtifacts(this.graph);
+    this.csv = createCsvSession(this.graph);
   }
 
   canEdit() {
@@ -85,6 +88,10 @@ export class ProjectEditorSession {
   start() {
     this.stopped = false;
     const stopArtifacts = this.artifacts.start();
+    const stopCsv = this.csv.start();
+    const stopAccess = this.state.subscribe((s) => {
+      if (s.accessLost) this.csv.clear();
+    });
     const unsubscribe = this.graph.subscribe((state, previous) => {
       if (this.suppress) return;
       if (state.saveRevision === previous.saveRevision) {
@@ -159,6 +166,8 @@ export class ProjectEditorSession {
       clearInterval(poll);
       unsubscribe();
       stopArtifacts();
+      stopCsv();
+      stopAccess();
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('pagehide', hide);
       if (this.state.getState().dirty) this.persist();

@@ -13,6 +13,7 @@ import {
   FileDigit,
   FileJson2,
   FileText,
+  FileSpreadsheet,
   Folder,
   Gauge,
   GitBranch,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react';
 export type IconComponent = LucideIcon;
 export const ICONS: Record<string, IconComponent> = {
+  csv_source: FileSpreadsheet,
   fan: Wind,
   experiment_setup: Box,
   boundary_condition: SlidersHorizontal,
@@ -54,6 +56,7 @@ export const ICONS: Record<string, IconComponent> = {
   metadata: FileText,
 };
 export const CATEGORY_ICONS: Record<string, IconComponent> = {
+  'Data inputs': FileSpreadsheet,
   Experiment: Box,
   Sensor: Activity,
   Equipment: HardDrive,
@@ -77,6 +80,7 @@ export const MORE_ICONS = {
   ShieldCheck,
 };
 export const TYPE_DESCRIPTIONS: Record<string, string> = {
+  csv_source: 'Local CSV data · Select columns to populate HDF5 datasets',
   fan: 'Industrial radial fan for flow characterization',
   experiment_setup: 'Experimental test rig',
   boundary_condition: 'Inlet or outlet condition',

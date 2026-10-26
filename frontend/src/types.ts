@@ -103,6 +103,12 @@ export interface Preview {
   node_count: number;
   edge_count: number;
 }
+export interface CsvPreview {
+  columns: string[];
+  row_count: number;
+  suggested_dtypes: ('int64' | 'float64' | 'string')[];
+  rows: string[][];
+}
 export interface ValidationIssue {
   path: string;
   rule: string;
