@@ -11,15 +11,16 @@ class Database:
         self.path = directory / "projects.sqlite3"
         with self.transaction() as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > 1:
+        if version > 2:
             raise RuntimeError("This database requires a newer application version.")
-        if version == 0:
-            schema = (Path(__file__).parent / "migrations" / "001_projects.sql").read_text(
-                encoding="utf-8"
-            )
+        migrations = ("001_projects.sql", "002_user_examples.sql")
+        for number, filename in enumerate(migrations, start=1):
+            if number <= version:
+                continue
+            schema = (Path(__file__).parent / "migrations" / filename).read_text(encoding="utf-8")
             with self.transaction() as connection:
                 connection.executescript(
-                    "BEGIN IMMEDIATE;\n" + schema + "\nPRAGMA user_version=1;\nCOMMIT;"
+                    "BEGIN IMMEDIATE;\n" + schema + f"\nPRAGMA user_version={number};\nCOMMIT;"
                 )
 
     @contextmanager

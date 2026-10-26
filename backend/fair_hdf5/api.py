@@ -14,6 +14,7 @@ from .access import Principal, fail
 from .catalog import demo
 from .domain import BlueprintInput
 from .errors import DesignError
+from .example_projects import example_csv
 from .services import CatalogService, DesignService
 
 
@@ -303,6 +304,15 @@ class CreateProjectInput(BaseModel):
 @router.get("/projects")
 def projects(request: Request, principal: Identity):
     return request.app.state.project_service.list(principal)
+
+
+@router.get("/examples/files/measurements.csv")
+def download_example_csv():
+    return Response(
+        example_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="measurements.csv"'},
+    )
 
 
 @router.post("/projects", status_code=201)

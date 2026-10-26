@@ -5,8 +5,9 @@ import secrets
 import time
 from uuid import uuid4
 
-from .access import fail
+from .access import ApplicationError, fail
 from .account_service import current_user, digest
+from .example_projects import bundled_examples
 from .project_blueprint import editable_blueprint
 
 
@@ -14,8 +15,9 @@ def project_access(connection, principal, project_id, *, owner=False):
     current_user(connection, principal)
     row = connection.execute(
         "SELECT p.*, u.display_name AS owner_name, COALESCE(m.role, '') AS member_role, "
-        "EXISTS(SELECT 1 FROM project_members WHERE project_id=p.id) AS shared "
+        "EXISTS(SELECT 1 FROM project_members WHERE project_id=p.id) AS shared, e.example_id "
         "FROM projects p JOIN users u ON u.id=p.owner_id "
+        "LEFT JOIN user_examples e ON e.project_id=p.id "
         "LEFT JOIN project_members m ON m.project_id=p.id AND m.user_id=? WHERE p.id=?",
         (principal.user_id, project_id),
     ).fetchone()
@@ -42,6 +44,7 @@ def project_metadata(row, user_id):
     } | {
         "role": "owner" if row["owner_id"] == user_id else row["member_role"],
         "shared": bool(row["shared"]),
+        "example_id": row["example_id"],
     }
 
 
@@ -94,6 +97,57 @@ class ProjectService:
     def __init__(self, database, settings, global_catalog):
         self.database, self.settings, self.global_catalog = database, settings, global_catalog
 
+    def ensure_examples(self, principal):
+        """Provision once, including existing accounts; deletion retains the receipt."""
+        with self.database.transaction() as connection:
+            current_user(connection, principal)
+            installed = {
+                row["example_id"]
+                for row in connection.execute(
+                    "SELECT example_id FROM user_examples WHERE user_id=?", (principal.user_id,)
+                )
+            }
+        pending = []
+        for example in bundled_examples():
+            if example["id"] in installed:
+                continue
+            try:
+                content = editable_blueprint(
+                    example["blueprint"], self.settings, self.global_catalog
+                )
+            except ApplicationError as error:
+                if error.code in {"graph_limit", "blueprint_too_large"}:
+                    continue
+                raise
+            pending.append((example, content))
+        if not pending:
+            return
+        with self.database.transaction(write=True) as connection:
+            current_user(connection, principal)
+            for example, content in pending:
+                if connection.execute(
+                    "SELECT 1 FROM user_examples WHERE user_id=? AND example_id=?",
+                    (principal.user_id, example["id"]),
+                ).fetchone():
+                    continue
+                identifier, now = str(uuid4()), time.time()
+                connection.execute(
+                    "INSERT INTO projects VALUES (?,?,?,?,?,1,?,?,NULL)",
+                    (
+                        identifier,
+                        principal.user_id,
+                        content["name"],
+                        example["description"],
+                        json.dumps(content, ensure_ascii=False),
+                        now,
+                        now,
+                    ),
+                )
+                connection.execute(
+                    "INSERT INTO user_examples VALUES (?,?,?,?)",
+                    (principal.user_id, example["id"], identifier, now),
+                )
+
     def catalog_service(self, principal, project_id, token=None, revision=None):
         from .project_catalog import ScopedCatalogRepository
         from .services import CatalogService
@@ -109,13 +163,15 @@ class ProjectService:
         )
 
     def list(self, principal):
+        self.ensure_examples(principal)
         with self.database.transaction() as connection:
             current_user(connection, principal)
             rows = connection.execute(
                 "SELECT p.*, u.display_name AS owner_name, COALESCE(m.role, '') AS member_role, "
-                "EXISTS(SELECT 1 FROM project_members WHERE project_id=p.id) AS shared "
+                "EXISTS(SELECT 1 FROM project_members WHERE project_id=p.id) AS shared, e.example_id "
                 "FROM projects p JOIN users u ON u.id=p.owner_id LEFT JOIN project_members m "
-                "ON m.project_id=p.id AND m.user_id=? WHERE p.owner_id=? OR m.user_id=? ORDER BY p.updated_at DESC",
+                "ON m.project_id=p.id AND m.user_id=? LEFT JOIN user_examples e ON e.project_id=p.id "
+                "WHERE p.owner_id=? OR m.user_id=? ORDER BY p.updated_at DESC",
                 (principal.user_id, principal.user_id, principal.user_id),
             )
             return [project_metadata(row, principal.user_id) for row in rows]

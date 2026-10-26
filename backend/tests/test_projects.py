@@ -65,7 +65,9 @@ class ProjectTests(CatalogTestCase):
 
     def test_private_projects_and_templates_are_hidden_even_from_an_admin(self):
         _, outsider = self.user("otheradmin", admin=True)
-        self.assertEqual(outsider.get("/api/projects").json(), [])
+        visible = outsider.get("/api/projects").json()
+        self.assertNotIn(self.project["id"], [p["id"] for p in visible])
+        self.assertTrue(all(p["role"] == "owner" and p["example_id"] for p in visible))
         for suffix in ("", "/members", "/catalog", "/edit-lock", "/catalog/unknown/revisions/1"):
             self.assertEqual(outsider.get(self.url + suffix).status_code, 404)
         self.assertEqual(self.save(outsider).status_code, 404)
@@ -74,7 +76,9 @@ class ProjectTests(CatalogTestCase):
     def test_membership_roles_and_private_copy(self):
         _, viewer = self.user("viewer")
         self.share("viewer", "viewer")
-        summary = viewer.get("/api/projects").json()[0]
+        summary = next(
+            p for p in viewer.get("/api/projects").json() if p["id"] == self.project["id"]
+        )
         self.assertEqual(summary["role"], "viewer")
         self.assertTrue(summary["shared"])
         self.assertEqual(viewer.get(self.url).status_code, 200)

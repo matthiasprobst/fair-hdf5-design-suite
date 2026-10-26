@@ -16,7 +16,7 @@ CSV_DEFAULTS = {
 
 
 def validate_source(config):
-    if not isinstance(config, dict) or set(config) - CSV_DEFAULTS.keys():
+    if not isinstance(config, dict) or set(config) - (CSV_DEFAULTS.keys() | {"example_file"}):
         raise DesignError("Unsupported CSV source configuration.")
     options = {**deepcopy(CSV_DEFAULTS), **deepcopy(config)}
     if (
@@ -31,6 +31,7 @@ def validate_source(config):
         or "\x00" in options["filename"]
         or not isinstance(options["columns"], list)
         or any(not isinstance(c, str) or "\x00" in c for c in options["columns"])
+        or ("example_file" in options and options["example_file"] != "measurements.csv")
     ):
         raise DesignError("Invalid CSV settings, filename, or column headers.")
     return options
