@@ -151,7 +151,7 @@ def validate_constraints(design: dict[str, Any], settings: Settings) -> dict[str
                     raise DesignError(f"Node {id}: invalid custom required field: {field}")
         if kind == "dataset":
             if config.get("dtype", "float64") not in ALLOWED_DTYPES:
-                raise DesignError(f"Node {id}: unsupported numeric dtype.")
+                raise DesignError(f"Node {id}: unsupported dataset dtype.")
             dataset_shapes[id] = parse_shape(str(config.get("shape", "0")), settings)
     dataset_paths = {n["config"]["path"] for n in nodes if node_template(n)["kind"] == "dataset"}
     for path in paths:

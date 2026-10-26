@@ -15,7 +15,18 @@ from .profiles import profile_iri as _profile_iri
 from .profiles import profile_required as _profile_required
 
 
-def hdf5_template(design: dict[str, Any], dataset_shapes: dict[str, tuple[int, ...]]) -> bytes:
+def dtype_name(dtype):
+    string = h5py.check_string_dtype(dtype)
+    return (
+        "string" if string and string.encoding == "utf-8" and string.length is None else str(dtype)
+    )
+
+
+def hdf5_template(
+    design: dict[str, Any],
+    dataset_shapes: dict[str, tuple[int, ...]],
+    dataset_values: dict[str, np.ndarray] | None = None,
+) -> bytes:
     # h5py's 'core' virtual filesystem lets us export an HDF5 file without a disk path.
     with h5py.File(f"template-{uuid4().hex}.h5", "w", driver="core", backing_store=False) as f:
         f.attrs["generated_by"] = "FAIR HDF5 Design Suite (POC)"
@@ -46,12 +57,16 @@ def hdf5_template(design: dict[str, Any], dataset_shapes: dict[str, tuple[int, .
                 f.require_group(parent)
                 if path in f:
                     raise DesignError(f"Cannot create dataset at {path}: object already exists.")
-                shape = dataset_shapes[node["id"]]
+                data = (dataset_values or {}).get(node["id"])
+                shape = data.shape if data is not None else dataset_shapes[node["id"]]
                 obj = f.create_dataset(
                     path,
+                    data=data,
                     shape=shape,
                     maxshape=(None, *shape[1:]),
-                    dtype=cfg.get("dtype", "float64"),
+                    dtype=h5py.string_dtype("utf-8")
+                    if cfg.get("dtype") == "string"
+                    else cfg.get("dtype", "float64"),
                     chunks=True,
                 )
                 obj.attrs["designed_shape"] = str(cfg.get("shape", "0"))
@@ -173,7 +188,7 @@ def structural_checks(design, f, dataset_shapes):
             continue
         if actual_kind == "dataset":
             checks += 2
-            if str(obj.dtype) != str(cfg.get("dtype", "float64")):
+            if dtype_name(obj.dtype) != str(cfg.get("dtype", "float64")):
                 issues.append(
                     {
                         "path": path,

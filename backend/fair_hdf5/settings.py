@@ -94,4 +94,6 @@ class Settings(BaseSettings):
             "max_edges": self.max_edges,
             "max_upload_bytes": self.max_upload_bytes,
             "shacl_engine": self.shacl_engine,
+            "max_dimension_size": self.max_dimension_size,
+            "max_dataset_elements": self.max_dataset_elements,
         }

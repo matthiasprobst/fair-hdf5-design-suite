@@ -11,6 +11,6 @@ PROFILES = Namespace(BASE + "profiles/")
 NODE_BASE = BASE + "node/"
 SHAPE_BASE = BASE + "shape/"
 
-ALLOWED_DTYPES = {"float32", "float64", "int32", "int64", "uint8", "uint16"}
+ALLOWED_DTYPES = {"float32", "float64", "int32", "int64", "uint8", "uint16", "string"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,90}$")
 KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")

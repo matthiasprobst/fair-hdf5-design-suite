@@ -7,6 +7,7 @@ import numpy as np
 from rdflib import OWL, RDF, BNode, Graph, Literal, URIRef
 from rdflib.namespace import SH, XSD
 
+from .hdf5 import dtype_name
 from .profile_bundles import bundle_graph
 from .profile_schema import executable_shapes
 from .profiles import node_template
@@ -141,7 +142,7 @@ def rdf_from_hdf5(design: dict[str, Any], f: h5py.File) -> Graph:
         if "profile_uri" in obj.attrs:
             graph.add((subject, H5.profile, Literal(str(obj.attrs["profile_uri"]))))
         if isinstance(obj, h5py.Dataset):
-            graph.add((subject, H5.dtype, Literal(str(obj.dtype))))
+            graph.add((subject, H5.dtype, Literal(dtype_name(obj.dtype))))
             graph.add(
                 (
                     subject,

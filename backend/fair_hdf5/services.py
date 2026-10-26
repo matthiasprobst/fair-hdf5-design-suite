@@ -9,6 +9,7 @@ from rdflib.compare import isomorphic
 from rdflib.namespace import SH
 
 from .catalog import CATALOG
+from .csv_data import convert_column, parse_csv
 from .data_nodes import CSV_SOURCE
 from .domain import ValidatedBlueprint, parse_blueprint
 from .engines import ValidationEngine, create_engine
@@ -18,6 +19,7 @@ from .library import FileCatalogRepository
 from .preview import structure_preview
 from .profile_bundles import resolve_bundle, unbundled_imports
 from .profile_schema import analyze_profile, parse_profile, profile_from_fields
+from .profiles import node_template
 from .repositories import CatalogRepository
 from .semantic import build_shapes, rdf_from_hdf5
 from .settings import Settings
@@ -76,6 +78,79 @@ class DesignService:
     def template(self, value: Any) -> bytes:
         blueprint = self._parse(value)
         return hdf5_template(blueprint.data, blueprint.dataset_shapes)
+
+    def csv_preview(self, file: BinaryIO, config: dict) -> dict:
+        content = file.read(self.settings.max_upload_bytes + 1)
+        return parse_csv(content, config, self.settings).preview()
+
+    def data_file(self, value: Any, files: dict[str, BinaryIO]) -> bytes:
+        blueprint = self._parse(value)
+        nodes = {node["id"]: node for node in blueprint.data["nodes"]}
+        datasets = {
+            key: node for key, node in nodes.items() if node_template(node)["kind"] == "dataset"
+        }
+        bindings = {
+            edge["target"]: edge for edge in blueprint.data["edges"] if edge.get("kind") == "data"
+        }
+        if not datasets or datasets.keys() != bindings.keys():
+            raise DesignError("Build HDF5 with data requires a CSV mapping for every dataset.")
+        sources = {edge["source"] for edge in bindings.values()}
+        if files.keys() != sources:
+            raise DesignError("Select a CSV file for every connected source; omit unused files.")
+        tables, upload_bytes, cells = {}, 0, 0
+        for identifier in sorted(sources):
+            source = nodes[identifier]
+            label = source.get("label") or identifier
+            content = files[identifier].read(self.settings.max_upload_bytes - upload_bytes + 1)
+            upload_bytes += len(content)
+            if upload_bytes > self.settings.max_upload_bytes:
+                raise UploadTooLarge("Combined CSV uploads exceed the configured byte limit.")
+            table = parse_csv(
+                content,
+                source["config"],
+                self.settings,
+                label,
+                self.settings.max_dataset_elements - cells,
+            )
+            cells += table.cells
+            if source["config"]["columns"] != table.columns:
+                raise DesignError(
+                    f"{label}: CSV columns changed. Review and accept the new headers before building."
+                )
+            if not table.rows:
+                raise DesignError(f"{label}: the CSV contains no data rows.")
+            tables[identifier] = table
+        values, elements, value_bytes = {}, 0, 0
+        for identifier, node in datasets.items():
+            edge = bindings[identifier]
+            source, table = nodes[edge["source"]], tables[edge["source"]]
+            shape = blueprint.dataset_shapes[identifier]
+            path = node["config"]["path"]
+            if len(shape) != 1 or shape[0] not in (0, len(table.rows)):
+                raise DesignError(
+                    f"{path}: CSV mapping requires shape 0 or exactly {len(table.rows)}."
+                )
+            elements += len(table.rows)
+            if elements > self.settings.max_dataset_elements:
+                raise UploadTooLarge("Combined populated datasets exceed the element limit.")
+            array = convert_column(
+                table,
+                edge["column_index"],
+                node["config"].get("dtype", "float64"),
+                source.get("label") or source["id"],
+                path,
+            )
+            value_bytes += (
+                sum(len(value.encode("utf-8")) + 8 for value in array)
+                if node["config"].get("dtype") == "string"
+                else array.nbytes
+            )
+            if value_bytes > self.settings.max_upload_bytes:
+                raise UploadTooLarge(
+                    "Combined dataset values exceed the generated-data byte limit."
+                )
+            values[identifier] = array
+        return hdf5_template(blueprint.data, blueprint.dataset_shapes, values)
 
     def validate_template(self, value: Any) -> dict[str, Any]:
         blueprint = self._parse(value)

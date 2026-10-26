@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi import Response as CookieResponse
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile as FormUploadFile
 
 from .access import Principal, fail
 from .catalog import demo
@@ -45,6 +47,8 @@ class CapabilitiesOutput(BaseModel):
     max_edges: int
     max_upload_bytes: int
     shacl_engine: Literal["pyshacl", "subset"]
+    max_dimension_size: int
+    max_dataset_elements: int
 
 
 @router.get("/catalog")
@@ -116,6 +120,57 @@ def export_hdf5(service: Service, blueprint: BlueprintInput):
         media_type="application/x-hdf5",
         headers={"Content-Disposition": 'attachment; filename="experiment-template.h5"'},
     )
+
+
+def json_object(raw, limit):
+    if len(raw.encode("utf-8")) > limit:
+        from .errors import UploadTooLarge
+
+        raise UploadTooLarge("The JSON form field is too large.")
+    try:
+        value = json.loads(raw)
+    except (ValueError, RecursionError) as exc:
+        raise DesignError("Invalid JSON form field.") from exc
+    if not isinstance(value, dict):
+        raise DesignError("Expected a JSON object.")
+    return value
+
+
+@router.post("/data/csv/preview")
+def csv_preview(service: Service, settings_json: str = Form(...), file: UploadFile = File(...)):
+    try:
+        return service.csv_preview(
+            file.file, json_object(settings_json, service.settings.max_blueprint_bytes)
+        )
+    finally:
+        file.file.close()
+
+
+@router.post("/export/hdf5/data")
+async def export_hdf5_data(request: Request, service: Service):
+    async with request.form(
+        max_files=service.settings.max_nodes,
+        max_fields=1,
+        max_part_size=service.settings.max_blueprint_bytes,
+    ) as form:
+        raw = form.get("design_json")
+        if not isinstance(raw, str):
+            raise DesignError("Missing design_json form field.")
+        files = {}
+        for key, item in form.multi_items():
+            if key == "design_json" and isinstance(item, str):
+                continue
+            if not isinstance(item, FormUploadFile) or key in files:
+                raise DesignError("Expected one CSV file per source node ID.")
+            files[key] = item.file
+        content = await run_in_threadpool(
+            service.data_file, json_object(raw, service.settings.max_blueprint_bytes), files
+        )
+        return Response(
+            content,
+            media_type="application/x-hdf5",
+            headers={"Content-Disposition": 'attachment; filename="experiment-data.h5"'},
+        )
 
 
 @router.post("/validate/template")
