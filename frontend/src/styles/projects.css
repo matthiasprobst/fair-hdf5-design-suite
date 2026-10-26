@@ -192,6 +192,14 @@ button:disabled {
   font-size: 11px;
   white-space: nowrap;
 }
+.example-badge {
+  border: 1px solid #cce5d9;
+  border-radius: 5px;
+  background: #eff9f3;
+  color: #276647;
+  padding: 3px 7px;
+  font-weight: 600;
+}
 .row-actions {
   display: flex;
   align-items: center;

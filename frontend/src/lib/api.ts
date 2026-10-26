@@ -24,6 +24,12 @@ async function postJson<T>(
   return parse(await (await post(url, body, signal)).json());
 }
 export const api = {
+  exampleCsv: async (signal?: AbortSignal) =>
+    new File(
+      [await (await request('/api/examples/files/measurements.csv', { signal })).blob()],
+      'measurements.csv',
+      { type: 'text/csv' },
+    ),
   csvPreview: async (file: File, config: Config, signal?: AbortSignal) => {
     const body = new FormData();
     body.append('settings_json', JSON.stringify(config));

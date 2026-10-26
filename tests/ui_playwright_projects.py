@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from uuid import uuid4
 
+import h5py
 from playwright.sync_api import expect, sync_playwright
 from ui_support import URL, create_project, sign_in
 
@@ -134,6 +135,73 @@ class ProjectBrowserTests(unittest.TestCase):
         expect(self.page.get_by_label("Experiment title")).to_have_value(renamed + " (copy)")
         self.assertNotEqual(self.page.url, self.project_url)
         self.assertEqual(self.page.locator(".draft-tag").inner_text(), "Private")
+
+    def test_examples_are_personal_projects_and_csv_data_can_be_loaded(self):
+        self.page.goto(URL + "/projects")
+        self.page.get_by_role("button", name="Examples", exact=True).click()
+        expect(self.page.locator(".project-card")).to_have_count(2)
+        expect(self.page.locator(".example-badge")).to_have_count(2)
+        own_examples = {
+            p["example_id"]: p
+            for p in self.context.request.get(URL + "/api/projects").json()
+            if p.get("example_id")
+        }
+        self.assertEqual(set(own_examples), {"radial-fan", "csv-measurements"})
+        viewer_context, _, _ = self.new_session("qaviewer")
+        other_examples = {
+            p["example_id"]: p
+            for p in viewer_context.request.get(URL + "/api/projects").json()
+            if p.get("example_id")
+        }
+        self.assertEqual(set(other_examples), set(own_examples))
+        self.assertTrue(
+            {p["id"] for p in own_examples.values()}.isdisjoint(
+                p["id"] for p in other_examples.values()
+            )
+        )
+        self.assertEqual(
+            viewer_context.request.get(
+                URL + "/api/projects/" + own_examples["csv-measurements"]["id"]
+            ).status,
+            404,
+        )
+        self.page.screenshot(path=str(OUT / "example-projects-desktop.png"), full_page=True)
+        self.page.get_by_role("link", name="Example: CSV to HDF5", exact=True).click()
+        expect(self.page.get_by_role("button", name="Finish editing", exact=True)).to_be_visible()
+        self.page.locator('.react-flow__node[data-id="csv_measurements"] .node-title').click()
+        expect(
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True)
+        ).to_be_disabled()
+        self.page.get_by_role("button", name="Load example CSV", exact=True).click()
+        expect(self.page.locator(".csv-summary")).to_contain_text("3 rows · 3 columns")
+        expect(self.page.locator(".csv-table")).to_contain_text("München")
+        expect(
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True)
+        ).to_be_enabled()
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True).click()
+        with h5py.File(transfer.value.path(), "r") as handle:
+            self.assertEqual(handle["/data/time"][:].tolist(), [0, 1, 2])
+            self.assertEqual(handle["/data/pressure"][:].tolist(), [1.25, 2.5, 3.75])
+            self.assertEqual(
+                handle["/data/sample"].asstr()[:].tolist(), ["München", "東京", "Sample C"]
+            )
+        saved = self.context.request.get(
+            URL + "/api/projects/" + own_examples["csv-measurements"]["id"]
+        ).json()
+        self.assertEqual(
+            saved["revision"], 1, "Loading a sample file must not autosave the blueprint"
+        )
+        self.assertNotIn("München", json.dumps(saved["blueprint"], ensure_ascii=False))
+        self.page.locator(".csv-table-wrap").scroll_into_view_if_needed()
+        self.page.screenshot(path=str(OUT / "example-csv-loaded.png"), full_page=True)
+        self.page.get_by_role("button", name="Back to projects", exact=True).click()
+        expect(self.page.get_by_role("heading", name="Projects", exact=True)).to_be_visible()
+        self.page.get_by_role("button", name="Examples", exact=True).click()
+        expect(self.page.locator(".project-card")).to_have_count(2)
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"), 390)
+        self.page.screenshot(path=str(OUT / "example-projects-mobile.png"), full_page=True)
 
     def test_private_project_sharing_viewer_and_editor_permissions(self):
         viewer_context, viewer, _ = self.new_session("qaviewer")
@@ -307,9 +375,11 @@ class ProjectBrowserTests(unittest.TestCase):
         page.get_by_label("Repeat new password", exact=True).fill(os.environ["FAIR_TEST_PASSWORD"])
         page.get_by_role("button", name="Change password", exact=True).click()
         expect(page.get_by_role("heading", name="Projects", exact=True)).to_be_visible()
+        expect(page.get_by_role("link", name="Example: CSV to HDF5", exact=True)).to_be_visible()
         expect(
-            page.get_by_role("heading", name="Your first project starts here", exact=True)
+            page.get_by_role("link", name="Example: Radial fan experiment", exact=True)
         ).to_be_visible()
+        expect(page.locator(".example-badge")).to_have_count(2)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,10 @@ Workflow connections describe experimental relationships. HDF5 paths describe th
 
 ## Build HDF5 with CSV data
 
+Your dashboard includes two personal example projects: **Example: Radial fan experiment** and **Example: CSV to HDF5**. Use the **Examples** filter to find them. Every account, including existing accounts, receives its own private, editable copies on its first dashboard visit. Subsequent visits preserve edits and do not recreate deleted examples. Copies are never synchronized with another user's projects or overwritten by updated examples. Examples that exceed the installation's configured graph or blueprint-size limits are skipped until those limits permit them.
+
+To try the CSV example, open **Example: CSV to HDF5**, select **Example CSV measurements**, and choose **Load example CSV**. Its three column mappings, dataset types, paths, metadata, and units are already configured. Then choose **Build HDF5 with data**. The bundled data is synthetic; loading it keeps it only in the current project session, just like a locally selected file.
+
 1. Open an unlocked project and add **CSV Source** from **Data inputs**. Editing starts automatically when you have edit permission.
 2. Set the delimiter, decimal separator, and header option, then select a UTF-8 CSV file. The inspector shows column types and previews the first 50 rows.
 3. Select columns and choose **Create datasets from selected columns**. Alternatively, connect the source's square output to an existing Dataset node's square input, then select its column in the inspector. Round ports continue to describe experimental relationships.
@@ -91,6 +95,8 @@ not remove them. Removing the volume removes both projects and the catalog.
 Browser storage holds recovery drafts, separated by account and project; the
 server remains the authoritative saved copy. Existing browser-only drafts can be
 explicitly imported as a private project after signing in.
+
+Database migration 2 adds per-user example provisioning records without modifying existing projects. These records also remember intentionally deleted examples. Back up the database with the rest of the data directory as described below.
 
 ## Accounts, projects and collaboration
 

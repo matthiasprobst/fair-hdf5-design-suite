@@ -45,6 +45,7 @@ export function parseSummary(v: unknown): ProjectSummary {
     !strings(v, ['id', 'name', 'description', 'owner_id', 'owner_name']) ||
     !['owner', 'editor', 'viewer'].includes(String(v.role)) ||
     typeof v.shared !== 'boolean' ||
+    (v.example_id !== undefined && v.example_id !== null && typeof v.example_id !== 'string') ||
     !['revision', 'created_at', 'updated_at'].every(
       (k) => typeof v[k] === 'number' && Number.isFinite(v[k]),
     ) ||

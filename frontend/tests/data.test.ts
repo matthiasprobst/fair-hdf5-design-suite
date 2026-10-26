@@ -71,6 +71,14 @@ test('invalid bindings and arbitrary source configuration are rejected', () => {
   assert.throws(() => parseBlueprint(design, catalog));
 });
 
+test('bundled CSV hints round trip while arbitrary file references are rejected', () => {
+  const design = dataBlueprint();
+  design.nodes[0].config.example_file = 'measurements.csv';
+  assert.deepEqual(toBlueprint(fromBlueprint(parseBlueprint(design, catalog))), design);
+  design.nodes[0].config.example_file = '../../private.csv';
+  assert.throws(() => parseBlueprint(design, catalog));
+});
+
 const capabilities = {
   max_nodes: 250,
   max_edges: 1000,

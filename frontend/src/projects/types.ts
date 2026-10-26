@@ -19,6 +19,7 @@ export interface Session {
   password_policy: PasswordPolicy;
 }
 export interface ProjectSummary {
+  example_id?: string | null;
   id: string;
   name: string;
   description: string;

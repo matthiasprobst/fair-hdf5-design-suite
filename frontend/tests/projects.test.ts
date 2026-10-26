@@ -147,6 +147,11 @@ test('project contracts reject malformed identities, roles and lock expiry', () 
   );
   assert.throws(() => parseSummary({ ...project, role: 'admin' }));
   assert.throws(() => parseSummary({ ...project, revision: 0 }));
+  assert.throws(() => parseSummary({ ...project, example_id: 123 }));
+  assert.equal(
+    parseSummary({ ...project, example_id: 'csv-measurements' }).example_id,
+    'csv-measurements',
+  );
   assert.throws(() =>
     parseLock({ user_id: 'alice', display_name: 'Alice', expires_at: 'tomorrow' }),
   );

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { Copy, FileSpreadsheet, Trash2, X } from 'lucide-react';
 import type { Config, DesignNode } from '../types';
 import { useProjectSession } from '../projects/EditorSessionContext';
 import { useEditorStore } from '../editor/context';
+import { api } from '../lib/api';
+import { errorMessage } from '../lib/validation';
 
 export function CsvSourceInspector({
   node,
@@ -19,6 +21,9 @@ export function CsvSourceInspector({
   const canEdit = session.canEdit();
   const input = useStore(session.csv.store, (s) => s.inputs[node.id]);
   const [selected, setSelected] = useState<number[]>([]);
+  const [loadingExample, setLoadingExample] = useState(false);
+  const exampleRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => exampleRequest.current?.abort(), []);
   const preview = input?.preview;
   const matching =
     preview && JSON.stringify(preview.columns) === JSON.stringify(node.config.columns);
@@ -35,6 +40,20 @@ export function CsvSourceInspector({
       graph
         .getState()
         .updateNode(node.id, { config: { columns: result.columns, filename: file.name } });
+  };
+  const loadExample = async () => {
+    exampleRequest.current?.abort();
+    const controller = new AbortController();
+    exampleRequest.current = controller;
+    setLoadingExample(true);
+    try {
+      const file = await api.exampleCsv(controller.signal);
+      if (!controller.signal.aborted) await load(file);
+    } catch (error) {
+      if (!controller.signal.aborted) onNotice(errorMessage(error), true);
+    } finally {
+      if (!controller.signal.aborted) setLoadingExample(false);
+    }
   };
   const createDatasets = () => {
     if (!preview || !matching) return;
@@ -81,6 +100,17 @@ export function CsvSourceInspector({
           Files are kept for this open project only. Select them again after reopening. Settings and
           mappings are saved.
         </p>
+        {node.config.example_file === 'measurements.csv' && (
+          <div className="csv-header-review">
+            <p>
+              This example includes synthetic time, pressure and sample-name data. Load it to try
+              the existing mappings.
+            </p>
+            <button disabled={loadingExample || input?.loading} onClick={() => void loadExample()}>
+              {loadingExample ? 'Loading example…' : 'Load example CSV'}
+            </button>
+          </div>
+        )}
         <div className="form-field">
           <label htmlFor="csv-name">Block name</label>
           <input
@@ -136,6 +166,7 @@ export function CsvSourceInspector({
           <input
             id="csv-file"
             type="file"
+            disabled={loadingExample}
             accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -153,10 +184,16 @@ export function CsvSourceInspector({
         </div>
         {input && (
           <div className="csv-file-actions">
-            <button disabled={input.loading} onClick={() => void load(input.file)}>
+            <button
+              disabled={input.loading || loadingExample}
+              onClick={() => void load(input.file)}
+            >
               {input.loading ? 'Loading CSV…' : 'Load preview'}
             </button>
-            <button disabled={input.loading} onClick={() => session.csv.remove(node.id)}>
+            <button
+              disabled={input.loading || loadingExample}
+              onClick={() => session.csv.remove(node.id)}
+            >
               Clear file
             </button>
           </div>
