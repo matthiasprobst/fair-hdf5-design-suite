@@ -9,6 +9,7 @@ import { useCanEdit } from '../projects/EditorSessionContext';
 import { CSV_SOURCE } from '../editor/dataNodes';
 import { CsvSourceInspector } from './CsvSourceInspector';
 import { DataBindingFields } from './DataBindingFields';
+import { relationshipOptions } from '../editor/rules';
 export function EditorInspector({
   onClose,
   onNotice,
@@ -25,6 +26,12 @@ export function EditorInspector({
   const node = useMemo(() => (selectedNode ? toNode(selectedNode) : null), [selectedNode]);
   const edge = useMemo(() => (selectedEdge ? toEdge(selectedEdge) : null), [selectedEdge]);
   const actions = editorStore.getState();
+  const edgeRelations = edge
+    ? relationshipOptions(
+        actions.nodes.find((n) => n.id === edge.source)?.data.blockType || '',
+        actions.nodes.find((n) => n.id === edge.target)?.data.blockType || '',
+      )
+    : undefined;
   if (node?.type === CSV_SOURCE)
     return <CsvSourceInspector key={node.id} node={node} onClose={onClose} onNotice={onNotice} />;
   if (edge?.kind === 'data')
@@ -55,6 +62,7 @@ export function EditorInspector({
       key={node?.id || edge?.id || 'empty'}
       node={node}
       edge={edge}
+      edgeRelations={edgeRelations}
       catalog={catalog}
       onUpdate={actions.updateNode}
       onDelete={(id) => actions.deleteElements([id])}

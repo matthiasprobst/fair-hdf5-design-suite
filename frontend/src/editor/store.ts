@@ -14,7 +14,7 @@ import type {
   Config,
   NodeType,
 } from '../types';
-import { makeId, suggestedRelation, uniquePath } from '../editor/rules';
+import { makeId, suggestedRelation, uniquePath, validRelationship } from '../editor/rules';
 import { CSV_SOURCE, csvSource } from './dataNodes';
 import { fromBlueprint, fromEdge, fromNode, toBlueprint, toEdge, toNode } from './adapters';
 import type { Graph, ScientificFlowEdge, ScientificFlowNode } from './adapters';
@@ -330,6 +330,9 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
       set((s) => {
         const edge = s.edges.find((e) => e.id === id);
         if (!edge || edge.data?.kind === 'data' || edge.data?.relation === relation) return s;
+        const source = s.nodes.find((n) => n.id === edge.source)!,
+          target = s.nodes.find((n) => n.id === edge.target)!;
+        if (!validRelationship(source.data.blockType, target.data.blockType, relation)) return s;
         return {
           edges: s.edges.map((e) =>
             e === edge
@@ -421,10 +424,7 @@ export function createEditorStore(canMutate: () => boolean = () => true) {
             (target?.data.template || s.catalog[target?.data.blockType || ''])?.kind ===
               'dataset' &&
             !s.edges.some((e) => e.target === c.target && e.data?.kind === 'data')
-          : c.sourceHandle === 'out' &&
-            c.targetHandle === 'in' &&
-            source?.data.blockType !== CSV_SOURCE &&
-            target?.data.blockType !== CSV_SOURCE) &&
+          : c.sourceHandle === 'out' && c.targetHandle === 'in') &&
         !!s.capabilities &&
         s.edges.length < s.capabilities.max_edges &&
         s.nodes.some((n) => n.id === c.source) &&

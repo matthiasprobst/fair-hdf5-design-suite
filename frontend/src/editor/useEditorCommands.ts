@@ -75,6 +75,11 @@ export function useEditorCommands(recoveryRaw: string | null) {
       if (text !== undefined)
         download(new Blob([text], { type: 'text/turtle' }), 'experiment.shacl.ttl');
     });
+  const exportMetadata = () =>
+    void execute('metadata', async (signal) => {
+      const blob = await api.metadata(toBlueprint(editorStore.getState()), signal);
+      if (!signal.aborted) download(blob, 'experiment.metadata.ttl');
+    });
   const previewShacl = () =>
     void execute('shacl-preview', async () => {
       if ((await artifacts.shacl()) !== undefined) setDialog('shacl');
@@ -164,6 +169,7 @@ export function useEditorCommands(recoveryRaw: string | null) {
     exportHdf5,
     exportData,
     exportShacl,
+    exportMetadata,
     previewShacl,
     previewStructure,
     runValidation,

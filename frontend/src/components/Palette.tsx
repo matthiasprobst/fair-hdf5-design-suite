@@ -16,7 +16,7 @@ import { useCanEdit } from '../projects/EditorSessionContext';
 import { CSV_SOURCE, csvSource } from '../editor/dataNodes';
 
 const order = [
-  'Data inputs',
+  'Data nodes',
   'Experiment',
   'Sensor',
   'Equipment',

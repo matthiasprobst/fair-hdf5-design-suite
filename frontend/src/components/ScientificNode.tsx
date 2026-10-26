@@ -18,9 +18,7 @@ function ScientificNodeBase({ id, data, selected }: NodeProps<ScientificFlowNode
   const tone = source ? 'green' : nodeTone(data.blockType, data.template?.color);
   return (
     <div className={`scientific-node node-${tone} ${selected ? 'active' : ''}`}>
-      {!source && (
-        <Handle type="target" position={Position.Left} id="in" className="scientific-handle" />
-      )}
+      <Handle type="target" position={Position.Left} id="in" className="scientific-handle" />
       {(data.template?.kind === 'dataset' || data.blockType === 'dataset') && (
         <Handle
           type="target"
@@ -54,7 +52,7 @@ function ScientificNodeBase({ id, data, selected }: NodeProps<ScientificFlowNode
             <span className="node-category-chip">
               {data.template?.category ||
                 (source
-                  ? 'Data input'
+                  ? 'Data node · DCAT'
                   : [
                         'pressure_sensor',
                         'temperature_sensor',
@@ -127,11 +125,11 @@ function ScientificNodeBase({ id, data, selected }: NodeProps<ScientificFlowNode
             position={Position.Right}
             id="data-out"
             className="scientific-handle data-handle"
+            style={{ top: '75%' }}
           />
         </>
-      ) : (
-        <Handle type="source" position={Position.Right} id="out" className="scientific-handle" />
-      )}
+      ) : null}
+      <Handle type="source" position={Position.Right} id="out" className="scientific-handle" />
     </div>
   );
 }

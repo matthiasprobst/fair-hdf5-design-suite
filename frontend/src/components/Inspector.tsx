@@ -25,6 +25,7 @@ const internal = ['path', 'dtype', 'shape', 'profile_uri', 'required_fields'];
 interface Props {
   node: DesignNode | null;
   edge: DesignEdge | null;
+  edgeRelations?: string[];
   catalog: Catalog;
   onUpdate: (id: string, patch: { label?: string; config?: Config }) => void;
   onDelete: (id: string) => void;
@@ -42,6 +43,7 @@ interface Props {
 export default function Inspector({
   node,
   edge,
+  edgeRelations = relations,
   catalog,
   onUpdate,
   onDelete,
@@ -86,8 +88,10 @@ export default function Inspector({
               value={edge.relation}
               onChange={(e) => onEdgeChange(edge.id, e.target.value)}
             >
-              {edge.predicate && <option value={edge.relation}>{edge.relation}</option>}
-              {relations.map((x) => (
+              {(edge.predicate || !edgeRelations.includes(edge.relation)) && (
+                <option value={edge.relation}>{edge.relation}</option>
+              )}
+              {edgeRelations.map((x) => (
                 <option value={x} key={x}>
                   {x.replaceAll('_', ' ')}
                 </option>
@@ -95,8 +99,9 @@ export default function Inspector({
             </select>
           </div>
           <div className="technical-note">
-            <Info size={15} /> File locations are defined independently by the nodes’ target HDF5
-            paths.
+            <Info size={15} /> Round-port relationships describe the experiment and declared
+            provenance. Use square ports to map CSV columns into HDF5 datasets. File paths are
+            configured on the target nodes.
           </div>
           <button className="delete-button" onClick={() => onDeleteEdge(edge.id)}>
             <Trash2 size={15} /> Delete connection

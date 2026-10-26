@@ -25,6 +25,8 @@ export type Graph = {
 };
 const relationColor: Record<string, string> = {
   provides_data: '#16845e',
+  generated: '#9664c7',
+  was_generated_by: '#9664c7',
   instrumented_by: '#2777e9',
   acquired_by: '#2579e6',
   processed_by: '#e9a01e',
@@ -61,7 +63,7 @@ export function fromEdge(e: DesignEdge): ScientificFlowEdge {
     label:
       e.kind === 'data'
         ? `Column ${(e.column_index ?? 0) + 1}`
-        : e.predicate
+        : e.predicate || e.relation === 'generated' || e.relation === 'was_generated_by'
           ? e.relation
           : undefined,
     data: {

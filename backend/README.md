@@ -79,6 +79,8 @@ Full-app Playwright checks remain in the root `tests/` directory.
 
 Built-in `csv_source` nodes are operational inputs rather than SHACL templates. Their scalar configuration contains `delimiter`, `decimal_separator`, `has_header`, `filename`, and a string-array `columns` manifest. Data edges carry `kind: "data"`, `column_index`, and `relation: "provides_data"`; each connects a source to a single Dataset node. Legacy edges omit `kind`.
 
+CSV nodes also accept regular relationship edges (without `kind`, `column_index`, or HDF5 profile-reference fields). `generated` points from a producer to a CSV data node; `was_generated_by` points in the reverse direction. These connections describe provenance and remain independent of executable column bindings.
+
 Authenticated, CSRF-protected `POST /api/data/csv/preview` accepts multipart `settings_json` and `file`, returning `columns`, `row_count`, `suggested_dtypes`, and at most 50 preview `rows`. `POST /api/export/hdf5/data` accepts multipart `design_json` plus one file field named for each connected source-node ID, returning an HDF5 attachment. Uploads are closed at request completion and are not persisted. `csv_data.py` owns parsing and checked conversions; `DesignService` owns input resolution and export orchestration. Existing template/SHACL APIs do not require source files.
 
 ## Personal examples
@@ -86,3 +88,11 @@ Authenticated, CSRF-protected `POST /api/data/csv/preview` accepts multipart `se
 `GET /api/projects` provisions missing bundled examples for the authenticated account, including existing accounts, before listing accessible projects. The write transaction rechecks the `(user_id, example_id)` receipt to prevent duplicates across tabs. Migration 2 records each receipt separately from its project; deleting a project sets the receipt's project ID to NULL so a later visit does not recreate it. Existing projects and edited example copies are never replaced. Provisioning skips examples that exceed configured graph/blueprint-size limits without recording a receipt.
 
 Project summaries include nullable `example_id` for original example copies. A normal private copy is independent and has no provisioning receipt. CSV nodes may include the optional `example_file: "measurements.csv"` hint; other file references are rejected. The authenticated `GET /api/examples/files/measurements.csv` endpoint serves only this packaged, synthetic CSV asset. The frontend explicitly loads it into session memory through the standard CSV preview flow; it is never embedded in saved blueprints.
+
+## DCAT and PROV metadata
+
+Authenticated, CSRF-protected `POST /api/export/rdf` accepts the same blueprint JSON as the SHACL endpoint and returns `experiment.metadata.ttl`. `provenance.py` builds the declared RDF graph offline: CSV nodes become `dcat:Dataset` resources with a distinct `dcat:Distribution`, an IANA CSV media-type IRI, and optional filename title. No upload, download URL, timestamp, or acquisition identity is inferred from a local filename.
+
+Producer/CSV relationships create a `prov:Activity` that `prov:used` the producer equipment/entity; both the dataset and CSV distribution reference it through `prov:wasGeneratedBy`. Column bindings declare target `prov:wasDerivedFrom` and import activities using the source distribution, with `h5:csvColumnIndex` and optional `h5:csvColumnName`. Other modeled relationships retain their declared predicates (or the application metadata namespace); `related_to` uses `dcterms:relation`.
+
+HDF5 materialization embeds the same graph in `/__design__/metadata_ttl` and its scope in the design group's `metadata_note` attribute. This is a declared design graph, including for empty templates, and is deliberately separate from the RDF projection used for file conformance. Do not feed these expected declarations back into validation as evidence that an actual acquisition happened. The existing SHACL export and HDF5 validation contract remain unchanged.

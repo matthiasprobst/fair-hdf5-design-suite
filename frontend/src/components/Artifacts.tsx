@@ -25,6 +25,7 @@ type Props = {
   busy: string;
   onShaclPreview: () => void;
   onShaclDownload: () => void;
+  onMetadataDownload: () => void;
   onStructure: () => void;
   onHdf5Download: () => void;
   onDataDownload: () => void;
@@ -44,6 +45,7 @@ export default function Artifacts({
   busy,
   onShaclPreview,
   onShaclDownload,
+  onMetadataDownload,
   onStructure,
   onHdf5Download,
   onDataDownload,
@@ -126,6 +128,13 @@ export default function Artifacts({
             </button>
             <button disabled={pending} onClick={onShaclDownload}>
               <Download size={14} /> Download .ttl
+            </button>
+            <button
+              disabled={pending}
+              onClick={onMetadataDownload}
+              title="Download declared DCAT/PROV data-node metadata"
+            >
+              <Download size={14} /> Metadata .ttl
             </button>
           </div>
         </article>

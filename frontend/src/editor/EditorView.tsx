@@ -172,6 +172,7 @@ export function EditorView() {
               onRefresh={commands.refresh}
               onShaclPreview={commands.previewShacl}
               onShaclDownload={commands.exportShacl}
+              onMetadataDownload={commands.exportMetadata}
               onStructure={commands.previewStructure}
               onHdf5Download={commands.exportHdf5}
               onDataDownload={commands.exportData}

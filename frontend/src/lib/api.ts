@@ -60,6 +60,8 @@ export const api = {
     postJson('/api/preview', design, parsePreview, signal),
   shacl: async (design: Blueprint, signal?: AbortSignal) =>
     (await post('/api/export/shacl', design, signal)).blob(),
+  metadata: async (design: Blueprint, signal?: AbortSignal) =>
+    (await post('/api/export/rdf', design, signal)).blob(),
   hdf5: async (design: Blueprint, signal?: AbortSignal) =>
     (await post('/api/export/hdf5', design, signal)).blob(),
   validateTemplate: (design: Blueprint, signal?: AbortSignal) =>

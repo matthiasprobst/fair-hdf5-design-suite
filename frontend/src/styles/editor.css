@@ -1829,6 +1829,12 @@
 :where(.editor-view) .artifact-hdf5 .artifact-actions button {
   flex: 1 1 125px;
 }
+:where(.editor-view) .artifact-shacl .artifact-actions {
+  flex-wrap: wrap;
+}
+:where(.editor-view) .artifact-shacl .artifact-actions button {
+  flex: 1 1 110px;
+}
 .artifact-data-export p {
   margin: 7px 0 0;
   font-size: 11px;

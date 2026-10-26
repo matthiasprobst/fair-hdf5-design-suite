@@ -105,12 +105,17 @@ export function parseBlueprint(value: unknown, catalog: Catalog, limits?: Capabi
       )
         return fail('invalid data connection.');
       dataTargets.add(target.id);
-    } else if (
-      source.type === CSV_SOURCE ||
-      target.type === CSV_SOURCE ||
-      e.column_index !== undefined
-    )
-      return fail('CSV sources require data connections.');
+    } else {
+      if (e.column_index !== undefined) return fail('column mappings require data connections.');
+      if (source.type === CSV_SOURCE || target.type === CSV_SOURCE) {
+        if (source.id === target.id || e.field_id !== undefined || e.predicate !== undefined)
+          return fail('data-node relationships use regular ports, not HDF5 profile references.');
+        if (e.relation === 'generated' && target.type !== CSV_SOURCE)
+          return fail('generated relationships point to data nodes.');
+        if (e.relation === 'was_generated_by' && source.type !== CSV_SOURCE)
+          return fail('was_generated_by relationships start at data nodes.');
+      }
+    }
     edgeIds.add(e.id);
     return {
       id: e.id,

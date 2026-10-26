@@ -9,6 +9,7 @@ import { createCsvSession } from '../src/editor/csvSession';
 import { api } from '../src/lib/api';
 import type { CsvPreview } from '../src/types';
 import { parseCsvPreview } from '../src/lib/contracts';
+import { relationshipOptions, suggestedRelation } from '../src/editor/rules';
 
 const catalog: Catalog = {
   dataset: { ...csvSource, label: 'Dataset', kind: 'dataset', defaults: {} },
@@ -117,6 +118,74 @@ test('data ports reject incompatible targets, duplicate inputs, and relationship
   graph.getState().connect(connection);
   assert.equal(graph.getState().edges[0].data?.kind, 'data');
   assert.equal(graph.getState().edges[0].data?.column_index, 0);
+});
+
+test('CSV data nodes support regular provenance relationships alongside column bindings', () => {
+  const design = dataBlueprint();
+  design.nodes.unshift({
+    id: 'daq',
+    type: 'daq',
+    label: 'DAQ',
+    x: -300,
+    y: 0,
+    config: { path: '/daq' },
+  });
+  const equipment = { ...csvSource, label: 'DAQ', kind: 'group' as const, defaults: {} };
+  const graph = createEditorStore();
+  graph.getState().setCapabilities(capabilities);
+  graph.getState().hydrate(design, { ...catalog, daq: equipment });
+  const connection = { source: 'daq', target: 'csv', sourceHandle: 'out', targetHandle: 'in' };
+  assert.equal(graph.getState().isValidConnection(connection), true);
+  graph.getState().connect(connection);
+  const edge = graph.getState().edges.find((e) => e.source === 'daq')!;
+  assert.equal(edge.data?.relation, 'generated');
+  assert.equal(edge.sourceHandle, 'out');
+  assert.equal(edge.targetHandle, 'in');
+  assert.equal(edge.data?.kind, undefined);
+  assert.equal(graph.getState().edges.find((e) => e.id === 'binding')?.data?.kind, 'data');
+  assert.equal(
+    graph.getState().isValidConnection({ ...connection, sourceHandle: 'data-out' }),
+    false,
+  );
+  const snapshot = toBlueprint(graph.getState());
+  assert.deepEqual(parseBlueprint(snapshot, { ...catalog, daq: equipment }), snapshot);
+  graph.getState().updateEdge(edge.id, 'was_generated_by');
+  assert.equal(graph.getState().edges.find((e) => e.id === edge.id)?.data?.relation, 'generated');
+  graph.getState().updateEdge(edge.id, 'related_to');
+  assert.equal(graph.getState().edges.find((e) => e.id === edge.id)?.data?.relation, 'related_to');
+  assert.equal(
+    graph.getState().isValidConnection({
+      source: 'csv',
+      target: 'data',
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    }),
+    true,
+  );
+  assert.equal(suggestedRelation('csv_source', 'daq'), 'was_generated_by');
+  assert.equal(suggestedRelation('csv_source', 'dataset'), 'writes_to');
+  assert.equal(suggestedRelation('metadata', 'csv_source'), 'describes');
+  assert.ok(relationshipOptions('daq', 'csv_source').includes('generated'));
+  assert.ok(!relationshipOptions('daq', 'csv_source').includes('was_generated_by'));
+});
+
+test('CSV relationship imports reject profile-reference and column-binding confusion', () => {
+  for (const patch of [
+    { relation: 'generated' },
+    { column_index: 0 },
+    { field_id: 'field', predicate: 'https://example.org/relation' },
+    { target: 'csv', relation: 'related_to' },
+  ]) {
+    const design = dataBlueprint();
+    design.edges.push({
+      id: 'relationship',
+      source: 'csv',
+      target: 'data',
+      relation: 'related_to',
+      ...patch,
+    });
+    assert.throws(() => parseBlueprint(design, catalog));
+  }
 });
 
 test('creating datasets is atomic, generates unique paths, and respects read-only access', () => {

@@ -18,7 +18,10 @@ from uuid import uuid4
 
 import h5py
 from fair_hdf5.catalog import CATALOG, demo
+from fair_hdf5.vocabulary import DCAT, NODE_BASE, PROV
 from playwright.sync_api import expect, sync_playwright
+from rdflib import RDF, Graph, URIRef
+from rdflib.compare import isomorphic
 from ui_support import create_project, sign_in
 
 URL = os.environ.get("FAIR_UI_URL", "http://127.0.0.1:5173")
@@ -212,9 +215,9 @@ class EditorBrowserTests(unittest.TestCase):
         self.assertEqual(self.viewport(), viewport, "Ordinary dragging must not fit the viewport")
         self.graph_visible(len(self.stored()["nodes"]))
 
-    def connect(self, source, target):
-        a = self.node(source).locator('[data-handleid="out"]').bounding_box()
-        b = self.node(target).locator('[data-handleid="in"]').bounding_box()
+    def connect(self, source, target, source_handle="out", target_handle="in"):
+        a = self.node(source).locator(f'[data-handleid="{source_handle}"]').bounding_box()
+        b = self.node(target).locator(f'[data-handleid="{target_handle}"]').bounding_box()
         self.page.mouse.move(a["x"] + a["width"] / 2, a["y"] + a["height"] / 2)
         self.page.mouse.down()
         self.page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2, steps=15)
@@ -342,6 +345,106 @@ class EditorBrowserTests(unittest.TestCase):
             self.assertAlmostEqual(pos["x"], n["x"], delta=0.01)
             self.assertAlmostEqual(pos["y"], n["y"], delta=0.01)
         self.page.screenshot(path=str(OUT / "after-reload.png"), full_page=True)
+
+    def test_daq_csv_provenance_and_column_mapping_export(self):
+        self.load(
+            {
+                "name": "DAQ → CSV → HDF5",
+                "version": "0.1",
+                "nodes": [
+                    {
+                        "id": "daq",
+                        "type": "daq",
+                        "label": "DAQ / Logger",
+                        "x": 20,
+                        "y": 100,
+                        "config": copy.deepcopy(CATALOG["daq"]["defaults"]),
+                    },
+                    {
+                        "id": "csv",
+                        "type": "csv_source",
+                        "label": "CSV measurements",
+                        "x": 350,
+                        "y": 100,
+                        "config": {
+                            "delimiter": ";",
+                            "decimal_separator": ",",
+                            "has_header": True,
+                            "filename": "pressure.csv",
+                            "columns": ["pressure"],
+                        },
+                    },
+                    {
+                        "id": "pressure",
+                        "type": "dataset",
+                        "label": "Pressure dataset",
+                        "x": 680,
+                        "y": 100,
+                        "config": {
+                            "path": "/data/pressure",
+                            "quantity": "pressure",
+                            "unit": "Pa",
+                            "dtype": "float64",
+                            "shape": "0",
+                        },
+                    },
+                ],
+                "edges": [],
+            }
+        )
+        self.graph_visible(3)
+        self.connect("daq", "csv")
+        expect(self.page.locator(".react-flow__edge")).to_have_count(1)
+        self.wait_saved()
+        relationship = self.stored()["edges"][0]
+        self.assertEqual(relationship["relation"], "generated")
+        self.assertNotIn("kind", relationship)
+        self.connect("csv", "pressure", "data-out", "data-in")
+        expect(self.page.locator(".react-flow__edge")).to_have_count(2)
+        self.wait_saved()
+        self.page.locator(f'.react-flow__edge[data-id="{relationship["id"]}"]').focus()
+        self.page.keyboard.press("Enter")
+        relation = self.page.locator(".inspector select").first
+        expect(relation).to_have_value("generated")
+        relation.select_option("related_to")
+        self.wait_saved()
+        self.assertEqual(
+            next(e for e in self.stored()["edges"] if e["id"] == relationship["id"])["relation"],
+            "related_to",
+        )
+        relation.select_option("generated")
+        self.wait_saved()
+        self.node("csv").locator(".node-title").click()
+        expect(self.page.locator(".inspector-profile-card")).to_contain_text("DCAT Dataset")
+        self.page.get_by_label("CSV file (UTF-8)", exact=True).set_input_files(
+            {
+                "name": "pressure.csv",
+                "mimeType": "text/csv",
+                "buffer": b"pressure\n1,25\n2,5\n",
+            }
+        )
+        expect(self.page.locator(".csv-summary")).to_contain_text("2 rows")
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Metadata .ttl", exact=True).click()
+        graph = Graph().parse(transfer.value.path(), format="turtle")
+        csv = URIRef(NODE_BASE + "csv")
+        acquisition = URIRef(str(csv) + "/generation/daq")
+        self.assertIn((csv, RDF.type, DCAT.Dataset), graph)
+        self.assertIn((csv, PROV.wasGeneratedBy, acquisition), graph)
+        self.assertIn((acquisition, PROV.used, URIRef(NODE_BASE + "daq")), graph)
+        self.assertIn((URIRef(NODE_BASE + "pressure"), PROV.wasDerivedFrom, csv), graph)
+        with self.page.expect_download() as transfer:
+            self.page.get_by_role("button", name="Build HDF5 with data", exact=True).click()
+        with h5py.File(transfer.value.path(), "r") as handle:
+            self.assertEqual(handle["/data/pressure"][:].tolist(), [1.25, 2.5])
+            stored = Graph().parse(
+                data=handle["/__design__/metadata_ttl"][()].decode(), format="turtle"
+            )
+            self.assertTrue(isomorphic(graph, stored))
+        self.page.locator(".csv-table-wrap").scroll_into_view_if_needed()
+        self.page.screenshot(path=str(OUT / "daq-csv-provenance.png"), full_page=True)
+        self.page.get_by_role("button", name="Validate", exact=True).click()
+        expect(self.page.get_by_text("All modeled checks passed", exact=True)).to_be_visible()
 
     def test_csv_sources_populate_hdf5_and_require_reselection(self):
         self.load({"name": "CSV measurements", "version": "0.1", "nodes": [], "edges": []})

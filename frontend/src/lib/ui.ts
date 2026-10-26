@@ -56,7 +56,7 @@ export const ICONS: Record<string, IconComponent> = {
   metadata: FileText,
 };
 export const CATEGORY_ICONS: Record<string, IconComponent> = {
-  'Data inputs': FileSpreadsheet,
+  'Data nodes': FileSpreadsheet,
   Experiment: Box,
   Sensor: Activity,
   Equipment: HardDrive,

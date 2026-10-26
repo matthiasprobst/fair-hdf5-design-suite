@@ -1,4 +1,5 @@
 import type { Blueprint, Catalog } from '../types';
+import { CSV_SOURCE } from './dataNodes';
 export function makeId(type: string, existing: Set<string>): string {
   let id: string;
   do {
@@ -37,10 +38,30 @@ export const relations = [
   'related_to',
 ];
 export function suggestedRelation(source: string, target: string): string {
+  if (source === 'metadata') return 'describes';
+  if (target === CSV_SOURCE && source !== CSV_SOURCE) return 'generated';
+  if (source === CSV_SOURCE && target === 'daq') return 'was_generated_by';
+  if (source === CSV_SOURCE && target === 'dataset') return 'writes_to';
+  if (source === CSV_SOURCE && target === 'process') return 'processed_by';
   if (source === 'fan' && target.endsWith('_sensor')) return 'instrumented_by';
   if (source.endsWith('_sensor') && target === 'daq') return 'acquired_by';
   if (source === 'daq' && target === 'process') return 'processed_by';
   if (source === 'process' && ['group', 'dataset'].includes(target)) return 'writes_to';
-  if (source === 'metadata') return 'describes';
   return 'related_to';
+}
+
+export function relationshipOptions(source: string, target: string): string[] {
+  return [
+    ...relations,
+    ...(target === CSV_SOURCE ? ['generated'] : []),
+    ...(source === CSV_SOURCE ? ['was_generated_by'] : []),
+  ];
+}
+
+export function validRelationship(source: string, target: string, relation: string): boolean {
+  if (source !== CSV_SOURCE && target !== CSV_SOURCE) return true;
+  return (
+    !(relation === 'generated' && target !== CSV_SOURCE) &&
+    !(relation === 'was_generated_by' && source !== CSV_SOURCE)
+  );
 }

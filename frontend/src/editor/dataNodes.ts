@@ -3,7 +3,7 @@ import type { CatalogItem, Config } from '../types';
 export const CSV_SOURCE = 'csv_source';
 export const csvSource: CatalogItem = {
   label: 'CSV Source',
-  category: 'Data inputs',
+  category: 'Data nodes',
   icon: 'csv_source',
   profile: '',
   kind: null,

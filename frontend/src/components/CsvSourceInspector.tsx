@@ -81,7 +81,7 @@ export function CsvSourceInspector({
   return (
     <aside className="inspector panel-shell">
       <div className="inspector-heading">
-        <strong>CSV Source</strong>
+        <strong>CSV data node</strong>
         <button className="icon-button" onClick={onClose} aria-label="Close inspector">
           <X size={17} />
         </button>
@@ -93,12 +93,16 @@ export function CsvSourceInspector({
           </span>
           <div>
             <strong>{node.label}</strong>
-            <p>One CSV column per HDF5 dataset</p>
+            <p>DCAT Dataset · CSV distribution</p>
           </div>
         </div>
         <p className="technical-note">
           Files are kept for this open project only. Select them again after reopening. Settings and
           mappings are saved.
+        </p>
+        <p className="technical-note">
+          Use round ports to describe relationships such as DAQ → generated → CSV. Square ports map
+          columns into HDF5 datasets. Metadata export includes the declared DCAT and PROV lineage.
         </p>
         {node.config.example_file === 'measurements.csv' && (
           <div className="csv-header-review">
