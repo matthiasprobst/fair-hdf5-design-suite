@@ -148,9 +148,8 @@ class ExampleProjectTests(CatalogTestCase):
     def test_csv_file_is_packaged_and_matches_the_repository_example(self):
         path = Path(__file__).resolve().parents[2] / "examples" / "csv" / "measurements.csv"
         self.assertEqual(example_csv(), path.read_bytes())
-        self.assertEqual(
-            csv_example()["nodes"][0]["config"]["columns"], ["time", "pressure", "sample"]
-        )
+        source = next(n for n in csv_example()["nodes"] if n["type"] == "csv_source")
+        self.assertEqual(source["config"]["columns"], ["time", "pressure", "sample"])
 
     def test_migration_preserves_an_existing_user_and_project(self):
         with tempfile.TemporaryDirectory() as directory:

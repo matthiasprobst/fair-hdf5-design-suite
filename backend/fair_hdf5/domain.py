@@ -31,6 +31,7 @@ class EdgeInput(BaseModel):
     model_config = ConfigDict(extra="allow", strict=True)
     source: str
     target: str
+    relation: str = "related_to"
 
 
 class BlueprintInput(BaseModel):

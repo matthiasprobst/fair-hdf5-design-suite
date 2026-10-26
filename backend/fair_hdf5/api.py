@@ -123,6 +123,15 @@ def export_hdf5(service: Service, blueprint: BlueprintInput):
     )
 
 
+@router.post("/export/rdf")
+def export_metadata(service: Service, blueprint: BlueprintInput):
+    return Response(
+        service.rdf(blueprint),
+        media_type="text/turtle",
+        headers={"Content-Disposition": 'attachment; filename="experiment.metadata.ttl"'},
+    )
+
+
 def json_object(raw, limit):
     if len(raw.encode("utf-8")) > limit:
         from .errors import UploadTooLarge

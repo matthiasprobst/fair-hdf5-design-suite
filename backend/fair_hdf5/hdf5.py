@@ -13,6 +13,7 @@ from .errors import DesignError
 from .profiles import node_template
 from .profiles import profile_iri as _profile_iri
 from .profiles import profile_required as _profile_required
+from .provenance import DECLARATION_NOTE, design_metadata
 
 
 def dtype_name(dtype):
@@ -134,6 +135,12 @@ def hdf5_template(
         design_group.create_dataset(
             "blueprint_json",
             data=json.dumps(design, ensure_ascii=False),
+            dtype=h5py.string_dtype("utf-8"),
+        )
+        design_group.attrs["metadata_note"] = DECLARATION_NOTE
+        design_group.create_dataset(
+            "metadata_ttl",
+            data=design_metadata(design).serialize(format="turtle"),
             dtype=h5py.string_dtype("utf-8"),
         )
         f.flush()

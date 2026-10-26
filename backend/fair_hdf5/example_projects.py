@@ -19,7 +19,7 @@ def csv_example():
             "id": "csv_measurements",
             "type": "csv_source",
             "label": "Example CSV measurements",
-            "x": 80,
+            "x": 350,
             "y": 230,
             "config": {
                 **deepcopy(CSV_DEFAULTS),
@@ -31,7 +31,25 @@ def csv_example():
             },
         }
     ]
-    edges = []
+    nodes.insert(
+        0,
+        {
+            "id": "example_daq",
+            "type": "daq",
+            "label": "Example DAQ / Logger",
+            "x": 40,
+            "y": 230,
+            "config": deepcopy(CATALOG["daq"]["defaults"]),
+        },
+    )
+    edges = [
+        {
+            "id": "daq_generated_csv",
+            "source": "example_daq",
+            "target": "csv_measurements",
+            "relation": "generated",
+        }
+    ]
     for index, (identifier, label, dtype, quantity, unit) in enumerate(
         [
             ("time", "Time", "float64", "time", "s"),
@@ -44,7 +62,7 @@ def csv_example():
                 "id": identifier,
                 "type": "dataset",
                 "label": label,
-                "x": 440,
+                "x": 680,
                 "y": 40 + index * 210,
                 "config": {
                     **deepcopy(CATALOG["dataset"]["defaults"]),
@@ -81,6 +99,6 @@ def bundled_examples():
         {
             "id": "csv-measurements",
             "blueprint": csv_example(),
-            "description": "Build HDF5 from synthetic CSV data: time, pressure and Unicode sample names. Open the CSV Source and choose Load example CSV, then Build HDF5 with data. This is your own editable copy.",
+            "description": "Explore DAQ → CSV data node → HDF5 datasets, including DCAT/PROV lineage. Open the CSV Source, choose Load example CSV, then Build HDF5 with data. The time, pressure and Unicode sample data are synthetic. This is your own editable copy.",
         },
     ]

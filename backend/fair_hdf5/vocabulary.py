@@ -8,6 +8,8 @@ BASE = "https://w3id.org/fair-hdf5-designer/demo/"
 H5 = Namespace(BASE + "hdf5#")
 META = Namespace(BASE + "metadata#")
 PROFILES = Namespace(BASE + "profiles/")
+DCAT = Namespace("http://www.w3.org/ns/dcat#")
+PROV = Namespace("http://www.w3.org/ns/prov#")
 NODE_BASE = BASE + "node/"
 SHAPE_BASE = BASE + "shape/"
 

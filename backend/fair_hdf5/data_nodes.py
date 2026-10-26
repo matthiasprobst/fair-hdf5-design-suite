@@ -3,9 +3,17 @@
 from copy import deepcopy
 
 from .errors import DesignError
+from .vocabulary import DCAT
 
 CSV_SOURCE = "csv_source"
-CSV_INFO = {"kind": None, "required": [], "fields": [], "label": "CSV Source"}
+CSV_INFO = {
+    "kind": None,
+    "required": [],
+    "fields": [],
+    "label": "CSV Source",
+    "node_class": "data",
+    "rdf_class": str(DCAT.Dataset),
+}
 CSV_DEFAULTS = {
     "delimiter": ",",
     "decimal_separator": ".",
@@ -62,7 +70,15 @@ def validate_data_edges(design):
                     "Data connections require a CSV column and one input per dataset."
                 )
             targets.add(target["id"])
-        elif source["type"] == CSV_SOURCE or target["type"] == CSV_SOURCE:
-            raise DesignError("CSV sources only support data connections to datasets.")
-        elif "column_index" in edge:
-            raise DesignError("Column mappings require a data connection.")
+        else:
+            if "column_index" in edge:
+                raise DesignError("Column mappings require a data connection.")
+            if source["type"] == CSV_SOURCE or target["type"] == CSV_SOURCE:
+                if source["id"] == target["id"] or "predicate" in edge or "field_id" in edge:
+                    raise DesignError(
+                        "Data-node relationships use regular ports, not HDF5 profile references."
+                    )
+                if edge.get("relation") == "generated" and target["type"] != CSV_SOURCE:
+                    raise DesignError("A generated relationship must point to a data node.")
+                if edge.get("relation") == "was_generated_by" and source["type"] != CSV_SOURCE:
+                    raise DesignError("A was_generated_by relationship must start at a data node.")

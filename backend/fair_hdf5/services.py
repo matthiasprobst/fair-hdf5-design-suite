@@ -20,6 +20,7 @@ from .preview import structure_preview
 from .profile_bundles import resolve_bundle, unbundled_imports
 from .profile_schema import analyze_profile, parse_profile, profile_from_fields
 from .profiles import node_template
+from .provenance import design_metadata
 from .repositories import CatalogRepository
 from .semantic import build_shapes, rdf_from_hdf5
 from .settings import Settings
@@ -74,6 +75,9 @@ class DesignService:
 
     def shacl(self, value: Any) -> str:
         return self.shapes(value).serialize(format="turtle")
+
+    def rdf(self, value: Any) -> str:
+        return design_metadata(self._parse(value).data).serialize(format="turtle")
 
     def template(self, value: Any) -> bytes:
         blueprint = self._parse(value)
