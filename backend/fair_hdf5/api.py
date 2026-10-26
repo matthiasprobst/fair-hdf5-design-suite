@@ -324,6 +324,24 @@ def download_example_csv():
     )
 
 
+@router.get("/examples")
+def examples(request: Request):
+    return request.app.state.example_service.list()
+
+
+@router.get("/examples/{identifier}")
+def example(identifier: str, request: Request):
+    return request.app.state.example_service.get(identifier)
+
+
+@router.post("/examples/{identifier}/copy", status_code=201)
+def copy_example(identifier: str, request: Request, principal: Identity):
+    selected = request.app.state.example_service.get(identifier)
+    return request.app.state.project_service.create(
+        principal, selected["name"], selected["description"], blueprint=selected["blueprint"]
+    )
+
+
 @router.post("/projects", status_code=201)
 def create_project(body: CreateProjectInput, request: Request, principal: Identity):
     return request.app.state.project_service.create(principal, **body.model_dump())

@@ -12,6 +12,7 @@ from .account_service import AccountService
 from .api import auth_router, router
 from .database import Database
 from .errors import DesignError, RevisionConflict, UploadTooLarge
+from .example_projects import ExampleService
 from .library import FileCatalogRepository
 from .project_service import ProjectService
 from .services import CatalogService, DesignService
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.database, settings.session_seconds, settings.password_min_length
     )
     app.state.project_service = ProjectService(app.state.database, settings, repository)
+    app.state.example_service = ExampleService(settings, repository)
     app.include_router(auth_router)
     app.include_router(router)
 
@@ -134,6 +136,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         @app.get("/admin/users")
         @app.get("/projects")
         @app.get("/projects/{project_id}")
+        @app.get("/examples")
+        @app.get("/examples/{example_id}")
         def home():
             index = settings.frontend_dist / "index.html"
             if index.is_file():

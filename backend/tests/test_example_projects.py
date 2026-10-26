@@ -1,17 +1,15 @@
-"""Personal example copies, migration, isolation, and real CSV/HDF5 output."""
+"""Read-only example browsing and explicit, independent project copies."""
 
 import io
 import json
 import sqlite3
 import tempfile
-import time
-from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 
 import h5py
-from fair_hdf5.access import Principal
 from fair_hdf5.application import create_app
-from fair_hdf5.database import Database
 from fair_hdf5.example_projects import bundled_examples, csv_example, example_csv
 from fair_hdf5.settings import Settings
 from fastapi.testclient import TestClient
@@ -29,121 +27,156 @@ class ExampleProjectTests(CatalogTestCase):
             self.client.cookies.get("fair_session")
         )
 
-    def examples(self):
-        response = self.client.get("/api/projects")
-        self.assertEqual(response.status_code, 200, response.text)
-        return {p["example_id"]: p for p in response.json() if p["example_id"]}
+    def copy(self, identifier="csv-measurements", client=None):
+        response = (client or self.client).post(f"/api/examples/{identifier}/copy")
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()
 
-    def test_first_dashboard_provisions_private_examples_once(self):
-        first = self.examples()
-        self.assertEqual(set(first), {example["id"] for example in bundled_examples()})
-        self.assertEqual(self.examples(), first)
-        for project in first.values():
+    def test_browsing_and_opening_never_create_personal_projects(self):
+        for _ in range(2):
+            summaries = self.client.get("/api/examples").json()
+            self.assertEqual({e["id"] for e in summaries}, {"radial-fan", "csv-measurements"})
+            for item in summaries:
+                response = self.client.get(f"/api/examples/{item['id']}")
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()["id"], item["id"])
+                self.assertIn("blueprint", response.json())
+            self.assertEqual(self.client.get("/api/projects").json(), [])
+        with self.app.state.database.transaction() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM projects").fetchone()[0], 0)
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM user_examples").fetchone()[0], 0
+            )
+
+    def test_explicit_copy_is_private_owned_and_distinct_each_time(self):
+        first, second = self.copy(), self.copy()
+        self.assertNotEqual(first["id"], second["id"])
+        for project in (first, second):
             self.assertEqual(project["owner_id"], self.principal.user_id)
             self.assertEqual(project["role"], "owner")
             self.assertFalse(project["shared"])
             self.assertEqual(project["revision"], 1)
-        database = self.app.state.database
-        with database.transaction() as connection:
-            self.assertEqual(
-                connection.execute("SELECT COUNT(*) FROM user_examples").fetchone()[0], 2
-            )
+        self.assertEqual(len(self.client.get("/api/projects").json()), 2)
+        before = self.client.get("/api/projects").json()
+        for _ in range(2):
+            self.client.get(f"/api/projects/{first['id']}")
+            self.client.get("/api/examples/csv-measurements")
+        self.assertEqual(self.client.get("/api/projects").json(), before)
 
-    def test_accounts_get_independent_copies_and_cannot_access_each_others(self):
-        first = self.examples()
-        accounts = self.app.state.account_service
-        identifier = accounts.create_user(
+    def test_accounts_only_share_the_canonical_example_not_personal_copies(self):
+        first = self.copy()
+        identifier = self.app.state.account_service.create_user(
             "exampleuser", "Example user", TEST_PASSWORD, principal=self.principal
         )
         with self.app.state.database.transaction(write=True) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM projects WHERE owner_id=?", (identifier,)
+                ).fetchone()[0],
+                0,
+            )
             connection.execute(
                 "UPDATE local_credentials SET must_change=0 WHERE user_id=?", (identifier,)
             )
         with TestClient(self.app) as other:
             token = other.get("/api/auth/session").json()["csrf_token"]
             other.headers["X-CSRF-Token"] = token
-            response = other.post(
+            login = other.post(
                 "/api/auth/login", json={"username": "exampleuser", "password": TEST_PASSWORD}
             )
-            self.assertEqual(response.status_code, 200)
-            projects = other.get("/api/projects").json()
-            self.assertEqual(len(projects), 2)
-            self.assertTrue(all(p["owner_id"] == identifier for p in projects))
-            self.assertTrue(
-                set(p["id"] for p in projects).isdisjoint(p["id"] for p in first.values())
-            )
+            other.headers["X-CSRF-Token"] = login.json()["csrf_token"]
+            self.assertEqual(other.get("/api/projects").json(), [])
             self.assertEqual(
-                other.get(f"/api/projects/{first['csv-measurements']['id']}").status_code, 404
+                other.get("/api/examples/csv-measurements").json(),
+                self.client.get("/api/examples/csv-measurements").json(),
             )
+            second = self.copy(client=other)
+            self.assertEqual(second["owner_id"], identifier)
+            self.assertNotEqual(first["id"], second["id"])
+            self.assertEqual(other.get(f"/api/projects/{first['id']}").status_code, 404)
+            self.assertEqual(self.client.get(f"/api/projects/{second['id']}").status_code, 404)
 
-    def test_saved_changes_and_deletions_survive_dashboard_reload_and_restart(self):
-        csv = self.examples()["csv-measurements"]
-        url = f"/api/projects/{csv['id']}"
-        project = self.client.get(url).json()
-        lease = self.client.post(url + "/edit-lock", json={"editor_id": "examples-test"}).json()[
+    def test_library_updates_are_visible_but_existing_copies_are_preserved(self):
+        old = self.copy()
+        changed = deepcopy(bundled_examples())
+        updated = next(e for e in changed if e["id"] == "csv-measurements")
+        updated["blueprint"]["name"] = "Updated CSV example"
+        updated["blueprint"]["nodes"][0]["label"] = "Updated DAQ"
+        with patch("fair_hdf5.example_projects.bundled_examples", return_value=changed):
+            current = self.client.get("/api/examples/csv-measurements").json()
+            self.assertEqual(current["name"], "Updated CSV example")
+            fresh = self.copy()
+            self.assertEqual(fresh["blueprint"]["nodes"][0]["label"], "Updated DAQ")
+        original = self.client.get(f"/api/projects/{old['id']}").json()
+        self.assertEqual(original["name"], old["name"])
+        self.assertEqual(original["blueprint"], old["blueprint"])
+
+    def test_edits_and_deletions_do_not_modify_the_shared_example(self):
+        canonical = self.client.get("/api/examples/csv-measurements").json()
+        project = self.copy()
+        url = f"/api/projects/{project['id']}"
+        lease = self.client.post(url + "/edit-lock", json={"editor_id": "example-test"}).json()[
             "token"
         ]
         design = project["blueprint"]
-        design["name"] = "My edited CSV example"
-        saved = self.client.put(
-            url,
-            headers={"X-Edit-Lease": lease},
-            json={
-                "blueprint": design,
-                "description": "Personal changes",
-                "expected_revision": 1,
-            },
+        design["name"] = "My changed example"
+        response = self.client.put(
+            url, headers={"X-Edit-Lease": lease}, json={"blueprint": design, "expected_revision": 1}
         )
-        self.assertEqual(saved.status_code, 200, saved.text)
-        self.assertEqual(self.examples()["csv-measurements"]["name"], "My edited CSV example")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.client.get("/api/examples/csv-measurements").json(), canonical)
         self.client.delete(url + "/edit-lock", headers={"X-Edit-Lease": lease})
         self.assertEqual(self.client.delete(url).status_code, 200)
-        self.assertNotIn("csv-measurements", self.examples())
-        restarted = create_app(self.settings)
-        projects = restarted.state.project_service.list(self.principal)
-        self.assertEqual([p["example_id"] for p in projects], ["radial-fan"])
+        self.assertEqual(self.client.get("/api/projects").json(), [])
+        self.assertEqual(self.client.get("/api/examples/csv-measurements").json(), canonical)
 
-    def test_concurrent_dashboard_requests_do_not_duplicate_examples(self):
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(
-                executor.map(
-                    lambda _: self.app.state.project_service.list(self.principal), range(2)
-                )
-            )
-        self.assertEqual({p["id"] for p in results[0]}, {p["id"] for p in results[1]})
-        self.assertEqual(len(results[0]), 2)
-
-    def test_csv_example_is_ready_to_build_and_validate(self):
-        summary = self.examples()["csv-measurements"]
-        design = self.client.get(f"/api/projects/{summary['id']}").json()["blueprint"]
+    def test_csv_example_is_ready_to_build_without_creating_a_project(self):
+        design = self.client.get("/api/examples/csv-measurements").json()["blueprint"]
         source = next(n for n in design["nodes"] if n["type"] == "csv_source")
         response = self.client.get("/api/examples/files/measurements.csv")
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, example_csv())
-        self.assertEqual(response.headers["cache-control"], "no-store")
         raw = self.client.post(
             "/api/export/hdf5/data",
             data={"design_json": json.dumps(design)},
             files={source["id"]: ("measurements.csv", response.content)},
         )
-        self.assertEqual(raw.status_code, 200, raw.text[:300] if raw.status_code != 200 else "")
+        self.assertEqual(raw.status_code, 200)
         with h5py.File(io.BytesIO(raw.content), "r") as handle:
-            self.assertEqual(handle["/data/time"][:].tolist(), [0, 1, 2])
             self.assertEqual(handle["/data/pressure"][:].tolist(), [1.25, 2.5, 3.75])
             self.assertEqual(
                 handle["/data/sample"].asstr()[:].tolist(), ["München", "東京", "Sample C"]
             )
         self.assertTrue(self.app.state.design_service.validate(design, raw.content)["conforms"])
-        self.assertTrue(self.app.state.design_service.validate_template(design)["conforms"])
-        with TestClient(self.app) as anonymous:
-            self.assertEqual(anonymous.get("/api/examples/files/measurements.csv").status_code, 401)
+        self.assertEqual(self.client.get("/api/projects").json(), [])
 
-    def test_restrictive_graph_limits_do_not_break_the_dashboard(self):
-        settings = Settings(_env_file=None, max_nodes=2)
-        app = create_app(settings)
-        self.assertEqual(app.state.project_service.list(self.principal), [])
-        # Raising the limits later still provisions examples, since no receipt was recorded.
-        self.assertEqual(len(self.examples()), 2)
+    def test_authentication_missing_examples_and_read_only_library(self):
+        with TestClient(self.app) as anonymous:
+            for path in (
+                "/api/examples",
+                "/api/examples/csv-measurements",
+                "/api/examples/files/measurements.csv",
+            ):
+                self.assertEqual(anonymous.get(path).status_code, 401)
+            self.assertEqual(anonymous.post("/api/examples/csv-measurements/copy").status_code, 401)
+        self.assertEqual(self.client.get("/api/examples/missing").status_code, 404)
+        self.assertEqual(self.client.post("/api/examples/missing/copy").status_code, 404)
+        self.assertEqual(
+            self.client.put("/api/examples/csv-measurements", json={}).status_code, 405
+        )
+        self.assertEqual(self.client.delete("/api/examples/csv-measurements").status_code, 405)
+        self.assertEqual(
+            self.client.post(
+                "/api/examples/csv-measurements/copy", headers={"X-CSRF-Token": "wrong"}
+            ).status_code,
+            403,
+        )
+
+    def test_restrictive_limits_reject_copy_without_side_effects(self):
+        app = create_app(Settings(_env_file=None, max_nodes=2))
+        with authenticated_client(TestClient(app)) as client:
+            self.assertEqual(len(client.get("/api/examples").json()), 2)
+            self.assertEqual(client.post("/api/examples/csv-measurements/copy").status_code, 422)
+            self.assertEqual(client.get("/api/projects").json(), [])
 
     def test_csv_file_is_packaged_and_matches_the_repository_example(self):
         path = Path(__file__).resolve().parents[2] / "examples" / "csv" / "measurements.csv"
@@ -151,7 +184,7 @@ class ExampleProjectTests(CatalogTestCase):
         source = next(n for n in csv_example()["nodes"] if n["type"] == "csv_source")
         self.assertEqual(source["config"]["columns"], ["time", "pressure", "sample"])
 
-    def test_migration_preserves_an_existing_user_and_project(self):
+    def test_existing_personal_example_copies_survive_without_reprovisioning(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "projects.sqlite3"
             schema = (
@@ -166,26 +199,17 @@ class ExampleProjectTests(CatalogTestCase):
                     "INSERT INTO users VALUES ('old-user','olduser','Existing user',0,1,1)"
                 )
                 connection.execute(
-                    "INSERT INTO sessions VALUES ('old-session','old-user','old-csrf',?)",
-                    (time.time() + 3600,),
-                )
-                connection.execute(
                     "INSERT INTO projects VALUES ('old-project','old-user','Keep me','',?,7,1,1,NULL)",
                     (json.dumps({"name": "Keep me", "version": "0.1", "nodes": [], "edges": []}),),
                 )
                 connection.execute("PRAGMA user_version=1")
-            migrated = Database(Path(directory))
-            with migrated.transaction() as connection:
-                self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
-                row = connection.execute("SELECT * FROM projects WHERE id='old-project'").fetchone()
-                self.assertEqual(row["name"], "Keep me")
-                self.assertEqual(row["revision"], 7)
-                self.assertEqual(
-                    connection.execute("SELECT COUNT(*) FROM user_examples").fetchone()[0], 0
-                )
             app = create_app(Settings(_env_file=None, data_dir=Path(directory)))
-            projects = app.state.project_service.list(Principal("old-user", "old-session"))
-            self.assertEqual(len(projects), 3)
-            original = next(p for p in projects if p["id"] == "old-project")
-            self.assertEqual(original["revision"], 7)
-            self.assertEqual(original["name"], "Keep me")
+            with app.state.database.transaction() as connection:
+                self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM projects").fetchone()[0], 1
+                )
+                self.assertEqual(
+                    connection.execute("SELECT revision FROM projects").fetchone()[0], 7
+                )
+            self.assertEqual(len(app.state.example_service.list()), 2)

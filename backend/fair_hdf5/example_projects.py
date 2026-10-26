@@ -1,9 +1,11 @@
-"""Bundled synthetic examples; each account receives independent project copies."""
+"""Current read-only library examples; personal copies are created explicitly."""
 
 from copy import deepcopy
 
+from .access import fail
 from .catalog import CATALOG, SEED_DIR, demo
 from .data_nodes import CSV_DEFAULTS
+from .project_blueprint import editable_blueprint
 
 EXAMPLE_CSV_FILENAME = "measurements.csv"
 
@@ -94,11 +96,38 @@ def bundled_examples():
         {
             "id": "radial-fan",
             "blueprint": fan,
-            "description": "Explore an experiment workflow with sensors, metadata, HDF5 paths and validation. This is your own editable copy.",
+            "description": "Explore an experiment workflow with sensors, metadata, HDF5 paths and validation. Copy this example to your projects to edit it.",
         },
         {
             "id": "csv-measurements",
             "blueprint": csv_example(),
-            "description": "Explore DAQ → CSV data node → HDF5 datasets, including DCAT/PROV lineage. Open the CSV Source, choose Load example CSV, then Build HDF5 with data. The time, pressure and Unicode sample data are synthetic. This is your own editable copy.",
+            "description": "Explore DAQ → CSV data node → HDF5 datasets, including DCAT/PROV lineage. Open the CSV Source, choose Load example CSV, then Build HDF5 with data. The data are synthetic. Copy this example to your projects to edit it.",
         },
     ]
+
+
+class ExampleService:
+    def __init__(self, settings, catalog):
+        self.settings, self.catalog = settings, catalog
+
+    @staticmethod
+    def summary(example):
+        design = example["blueprint"]
+        return {
+            "id": example["id"],
+            "name": design["name"],
+            "description": example["description"],
+            "node_count": len(design["nodes"]),
+            "edge_count": len(design["edges"]),
+        }
+
+    def list(self):
+        return [self.summary(example) for example in bundled_examples()]
+
+    def get(self, identifier):
+        example = next((e for e in bundled_examples() if e["id"] == identifier), None)
+        if example is None:
+            fail(404, "example_not_found", "Example not found.")
+        return self.summary(example) | {
+            "blueprint": editable_blueprint(example["blueprint"], self.settings, self.catalog)
+        }
