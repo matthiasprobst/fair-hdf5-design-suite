@@ -15,6 +15,8 @@ import { UsersView } from './admin/UsersView';
 import './styles/projects.css';
 
 const ProjectRoute = lazy(() => import('./projects/ProjectRoute'));
+const ExamplesView = lazy(() => import('./examples/ExamplesView'));
+const ExampleRoute = lazy(() => import('./examples/ExampleRoute'));
 function ApplicationLayout() {
   const { user, loading, error, refresh } = useAuth();
   const location = useLocation(),
@@ -35,15 +37,18 @@ function ApplicationLayout() {
   if (!user) return <Navigate to="/login" state={{ returnTo: location.pathname }} replace />;
   if (user.must_change_password && !['/account', '/logout'].includes(location.pathname))
     return <Navigate to="/account" replace />;
-  const inProject = /^\/projects\/[^/]+$/.test(location.pathname);
+  const inProject = /^\/(projects|examples)\/[^/]+$/.test(location.pathname);
+  const inExamples = /^\/examples(?:\/|$)/.test(location.pathname);
   return (
     <AppShell
       header={
         <GlobalHeader
           user={user}
           inProject={inProject}
+          inExamples={inExamples}
           onNavigate={(destination) => {
             if (destination === 'projects') navigate('/projects');
+            else if (destination === 'examples') navigate('/examples');
             else window.dispatchEvent(new CustomEvent('fair:navigate', { detail: destination }));
           }}
           onValidate={() => window.dispatchEvent(new Event('fair:validate'))}
@@ -73,6 +78,8 @@ const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/projects" replace /> },
       { path: '/projects', element: <ProjectsView /> },
       { path: '/projects/:id', element: <ProjectRoute /> },
+      { path: '/examples', element: <ExamplesView /> },
+      { path: '/examples/:id', element: <ExampleRoute /> },
       { path: '/account', element: <AccountView /> },
       { path: '/admin/users', element: <UsersView /> },
       { path: '/logout', element: <LogoutView /> },

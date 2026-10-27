@@ -200,6 +200,68 @@ button:disabled {
   padding: 3px 7px;
   font-weight: 600;
 }
+.examples-page .project-card > .row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.example-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: #f8faff;
+  color: #24334c;
+}
+.example-preview-toolbar > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.example-preview-toolbar strong {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.example-preview-toolbar a {
+  color: #2867c8;
+  text-decoration: none;
+  font-size: 13px;
+}
+.example-preview-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.example-preview-toolbar .primary-btn {
+  color: #fff;
+  background: #3276e6;
+  border: 1px solid #3276e6;
+}
+.example-preview-toolbar .secondary-btn {
+  color: #425674;
+  background: #fff;
+  border: 1px solid #dae2ef;
+}
+.example-preview-toolbar .form-error {
+  margin: 0;
+  width: 100%;
+}
+@media (max-width: 550px) {
+  .projects-page .page-heading > .row-actions {
+    flex-wrap: wrap;
+  }
+  .example-preview-toolbar .row-actions {
+    flex-wrap: wrap;
+  }
+}
 .row-actions {
   display: flex;
   align-items: center;

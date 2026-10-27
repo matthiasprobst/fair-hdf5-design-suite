@@ -4,13 +4,14 @@ import { ChevronDown, Menu, LogOut, UserRound, Settings } from 'lucide-react';
 import type { User } from '../projects/types';
 import '../styles/shell.css';
 
-export type NavigationDestination = 'projects' | 'templates' | 'profile' | 'about';
+export type NavigationDestination = 'projects' | 'examples' | 'templates' | 'profile' | 'about';
 
 type HeaderProps = {
   onNavigate: (destination: NavigationDestination) => void;
   onValidate: () => void;
   user: User;
   inProject: boolean;
+  inExamples?: boolean;
   onAccount: () => void;
   onLogout: () => void;
   onAdmin: () => void;
@@ -31,6 +32,7 @@ export function GlobalHeader({
   onValidate,
   user,
   inProject,
+  inExamples = false,
   onAccount,
   onLogout,
   onAdmin,
@@ -74,10 +76,16 @@ export function GlobalHeader({
         onClick={() => setNavigationOpen(false)}
       >
         <button
-          aria-current={!inProject ? 'page' : undefined}
+          aria-current={!inProject && !inExamples ? 'page' : undefined}
           onClick={() => onNavigate('projects')}
         >
           Projects
+        </button>
+        <button
+          aria-current={inExamples ? 'page' : undefined}
+          onClick={() => onNavigate('examples')}
+        >
+          Examples
         </button>
         <button disabled={!inProject} onClick={() => onNavigate('templates')}>
           Templates

@@ -5,6 +5,7 @@ import { CircleCheck, Code2, LoaderCircle } from 'lucide-react';
 import Artifacts from '../components/Artifacts';
 import Modal from '../components/Modal';
 import { useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useProjectSession } from '../projects/EditorSessionContext';
 import { useNavigate } from 'react-router-dom';
 import { useEditor } from './store';
@@ -14,7 +15,7 @@ import { EditorFeedback } from './components/EditorFeedback';
 import { EditorWorkspace } from './components/EditorWorkspace';
 import '../styles/editor.css';
 
-export function EditorView() {
+export function EditorView({ toolbar }: { toolbar?: ReactNode } = {}) {
   const initialized = useEditor((state) => state.initialized);
   const limitError = useEditor((state) =>
     state.initialized ? graphLimitError(state, state.capabilities) : '',
@@ -77,13 +78,15 @@ export function EditorView() {
 
   return (
     <main className="editor-view">
-      <ProjectToolbar
-        name={name}
-        savedAt={savedAt}
-        storageError={storageError}
-        hasRecovery={recoveryRaw !== null}
-        commands={commands}
-      />
+      {toolbar ?? (
+        <ProjectToolbar
+          name={name}
+          savedAt={savedAt}
+          storageError={storageError}
+          hasRecovery={recoveryRaw !== null}
+          commands={commands}
+        />
+      )}
       {sessionState.project.edit_lock && sessionState.mode === 'view' && (
         <div className="project-session-banner">
           <p>

@@ -105,12 +105,7 @@ export function ProjectsView() {
   };
   const shown = projects.filter(
     (p) =>
-      (filter === 'all' ||
-        (filter === 'examples'
-          ? !!p.example_id
-          : filter === 'mine'
-            ? p.role === 'owner'
-            : p.role !== 'owner')) &&
+      (filter === 'all' || (filter === 'mine' ? p.role === 'owner' : p.role !== 'owner')) &&
       p.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
   return (
@@ -120,19 +115,25 @@ export function ProjectsView() {
           <span className="eyebrow">Your workspace</span>
           <h1>Projects</h1>
           <p>
-            Explore your personal example projects, create designs, or work with selected people.
+            Keep your designs private or work with selected people. Browse the example library for
+            ideas.
           </p>
         </div>
-        <button
-          className="primary-btn"
-          onClick={() => {
-            setError('');
-            setCreating(true);
-          }}
-        >
-          <Plus size={17} />
-          New project
-        </button>
+        <div className="row-actions">
+          <Link className="secondary-btn" to="/examples">
+            Browse examples
+          </Link>
+          <button
+            className="primary-btn"
+            onClick={() => {
+              setError('');
+              setCreating(true);
+            }}
+          >
+            <Plus size={17} />
+            New project
+          </button>
+        </div>
       </div>
       {legacy && (
         <div className="recovery-banner">
@@ -169,7 +170,6 @@ export function ProjectsView() {
           {[
             ['all', 'All projects'],
             ['mine', 'My projects'],
-            ['examples', 'Examples'],
             ['shared', 'Shared with me'],
           ].map(([value, label]) => (
             <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
@@ -220,7 +220,7 @@ export function ProjectsView() {
                   </Link>
                   {p.description && <p className="project-description">{p.description}</p>}
                   <div className="project-meta">
-                    {p.example_id && <span className="example-badge">Example · Personal copy</span>}
+                    {p.example_id && <span className="example-badge">Copied example</span>}
                     <span>
                       {p.shared ? <Users size={13} /> : <LockKeyhole size={13} />}
                       {p.shared ? 'Shared' : 'Private'}

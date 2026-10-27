@@ -19,11 +19,13 @@ Round-port connections describe experimental relationships and provenance. Squar
 
 ## Build HDF5 with CSV data
 
-Your dashboard includes two personal example projects: **Example: Radial fan experiment** and **Example: CSV to HDF5**. Use the **Examples** filter to find them. Every account, including existing accounts, receives its own private, editable copies on its first dashboard visit. Subsequent visits preserve edits and do not recreate deleted examples. Copies are never synchronized with another user's projects or overwritten by updated examples. Examples that exceed the installation's configured graph or blueprint-size limits are skipped until those limits permit them.
+Open **Examples** in the main navigation to browse **Example: Radial fan experiment** and **Example: CSV to HDF5**. This shared, read-only gallery shows the bundled examples from the current application version. Application updates can therefore improve the examples for everyone. Opening the gallery or an example creates no personal projects and takes no editing reservation.
 
-To try the CSV example, open **Example: CSV to HDF5**, select **Example CSV measurements**, and choose **Load example CSV**. Its three column mappings, dataset types, paths, metadata, and units are already configured. Then choose **Build HDF5 with data**. The bundled data is synthetic; loading it keeps it only in the current project session, just like a locally selected file.
+Choose **Copy to my projects** when you want your own private, editable project. Each explicit copy is independent; your changes do not affect the shared example or other users. Existing copies keep their contents when the bundled example changes. New accounts start with an empty project space, and previously created personal example copies remain available.
 
-New CSV example copies also contain a DAQ connected to the CSV data node with **generated**. Previously saved copies keep their contents; you can add a DAQ and connect its round output to the CSV's round input yourself.
+To try the CSV example, open **Example: CSV to HDF5** in the gallery, select **Example CSV measurements**, and choose **Load example CSV**. Its three column mappings, dataset types, paths, metadata, and units are already configured. Then choose **Build HDF5 with data**. You can inspect the graph, preview data, validate, and export without making a copy. The bundled data is synthetic; loading it keeps it only in the open preview or project session. After copying, load the file again in your new project.
+
+The current CSV example also contains a DAQ connected to the CSV data node with **generated**. Previously saved copies keep their contents; you can add a DAQ and connect its round output to the CSV's round input yourself.
 
 1. Open an unlocked project and add **CSV Source** from **Data nodes**. Editing starts automatically when you have edit permission.
 2. Set the delimiter, decimal separator, and header option, then select a UTF-8 CSV file. The inspector shows column types and previews the first 50 rows.
@@ -109,7 +111,7 @@ Browser storage holds recovery drafts, separated by account and project; the
 server remains the authoritative saved copy. Existing browser-only drafts can be
 explicitly imported as a private project after signing in.
 
-Database migration 2 adds per-user example provisioning records without modifying existing projects. These records also remember intentionally deleted examples. Back up the database with the rest of the data directory as described below.
+Existing example projects and legacy provisioning records remain intact. Automatic example provisioning is disabled; listing projects, opening the gallery, and opening examples do not create projects. Back up the database with the rest of the data directory as described below.
 
 ## Accounts, projects and collaboration
 
