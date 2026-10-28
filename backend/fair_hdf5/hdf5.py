@@ -1,19 +1,23 @@
 """HDF5 materialization, request-owned files, and structural checks."""
 
 import json
+import os
 import tempfile
 from contextlib import contextmanager
+from hashlib import sha256
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import h5py
 import numpy as np
+from rdflib import Literal, URIRef
 
 from .errors import DesignError
 from .profiles import node_template
 from .profiles import profile_iri as _profile_iri
 from .profiles import profile_required as _profile_required
-from .provenance import DECLARATION_NOTE, design_metadata
+from .provenance import DECLARATION_NOTE, design_metadata, node_iri
 
 
 def dtype_name(dtype):
@@ -138,13 +142,119 @@ def hdf5_template(
             dtype=h5py.string_dtype("utf-8"),
         )
         design_group.attrs["metadata_note"] = DECLARATION_NOTE
-        design_group.create_dataset(
-            "metadata_ttl",
-            data=design_metadata(design).serialize(format="turtle"),
-            dtype=h5py.string_dtype("utf-8"),
-        )
         f.flush()
-        return f.id.get_file_image()
+        content = f.id.get_file_image()
+    return _annotate_rdf(content, design)
+
+
+def _annotate_rdf(content: bytes, design: dict[str, Any]) -> bytes:
+    """Write the design and HDF5 metadata RDF using h5rdmtoolbox annotations."""
+    # The toolbox serializer needs a filename, while the API contract remains bytes-in/bytes-out.
+    with tempfile.TemporaryDirectory(prefix="fair-hdf5-rdf-") as directory:
+        filename = Path(directory) / "export.h5"
+        filename.write_bytes(content)
+        with h5py.File(filename, "r") as source:
+            graph = design_metadata(design)
+            from .semantic import rdf_from_hdf5
+
+            graph += rdf_from_hdf5(design, source)
+
+        _configure_toolbox_directories()
+        import h5rdmtoolbox as h5tbx
+
+        by_subject = {
+            str(node_iri(node["id"])): node["config"]["path"]
+            for node in design["nodes"]
+            if node_template(node)["kind"]
+        }
+        with h5tbx.File(filename, "r+") as h5:
+            subject_objects = {}
+            for subject in sorted({str(subject) for subject in graph.subjects()}, key=str):
+                path = by_subject.get(subject)
+                if path is None:
+                    path = f"/__design__/rdf_resources/{sha256(subject.encode()).hexdigest()}"
+                    resource = h5.require_group(path)
+                else:
+                    resource = h5[path]
+                resource.rdf.subject = subject
+                subject_objects[subject] = resource
+
+            typed_objects = {}
+            for index, (subject, predicate, value) in enumerate(
+                sorted(graph, key=lambda triple: tuple(map(str, triple)))
+            ):
+                resource = subject_objects[str(subject)]
+                key = f"rdf_statement_{index:06d}"
+                resource.attrs[key] = (
+                    value.toPython()
+                    if isinstance(value, Literal)
+                    and value.datatype
+                    and value.datatype.endswith(
+                        (
+                            "#integer",
+                            "#int",
+                            "#long",
+                            "#short",
+                            "#byte",
+                            "#boolean",
+                            "#float",
+                            "#double",
+                        )
+                    )
+                    else str(value)
+                )
+                resource.rdf.predicate[key] = str(predicate)
+                if isinstance(value, URIRef):
+                    resource.rdf.object[key] = str(value)
+                elif (
+                    isinstance(value, Literal)
+                    and (
+                        value.datatype
+                        or value.language
+                        or str(value).startswith(("http://", "https://"))
+                    )
+                    and not (
+                        value.datatype
+                        and value.datatype.endswith(
+                            (
+                                "#integer",
+                                "#int",
+                                "#long",
+                                "#short",
+                                "#byte",
+                                "#boolean",
+                                "#float",
+                                "#double",
+                            )
+                        )
+                    )
+                ):
+                    typed_objects.setdefault(str(subject), {})[key] = {
+                        "$type": "rdflib.term.Literal",
+                        "lexical_or_value": str(value),
+                        "lang": value.language,
+                        "datatype": str(value.datatype) if value.datatype else None,
+                    }
+
+            for subject, values in typed_objects.items():
+                resource = subject_objects[subject]
+                current = resource.attrs.get("RDF_OBJECT", {})
+                if isinstance(current, str):
+                    current = json.loads(current)
+                resource.attrs["RDF_OBJECT"] = json.dumps({**current, **values})
+
+        return filename.read_bytes()
+
+
+def _configure_toolbox_directories() -> None:
+    """Keep the toolbox's optional caches writable in read-only-home deployments."""
+    if os.access(Path.home(), os.W_OK):
+        return
+    root = Path(tempfile.gettempdir()) / "fair-hdf5-h5rdmtoolbox"
+    os.environ.setdefault("XDG_DATA_HOME", str(root / "xdg-data"))
+    os.environ.setdefault("H5RDMTOOLBOX_LOG_DIR", str(root / "log"))
+    os.environ.setdefault("H5RDMTOOLBOX_USER_DATA_DIR", str(root / "data"))
+    os.environ.setdefault("H5RDMTOOLBOX_CACHE_DIR", str(root / "cache"))
 
 
 @contextmanager

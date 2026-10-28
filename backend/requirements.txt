@@ -1,6 +1,7 @@
 fastapi>=0.110,<1
 uvicorn>=0.27,<1
 h5py>=3.10,<5
+h5rdmtoolbox>=2.8.2,<3
 numpy>=1.26,<3
 rdflib>=7,<9
 python-multipart>=0.0.9

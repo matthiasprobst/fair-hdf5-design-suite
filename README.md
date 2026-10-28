@@ -1,6 +1,6 @@
 # FAIR HDF5 Design Suite
 
-A research prototype for visually designing experiment workflows and HDF5 target structures for fluid-mechanics data. The React and TypeScript interface is backed by a Python API using FastAPI, h5py, RDFLib, and SHACL.
+A research prototype for visually designing experiment workflows and HDF5 target structures for fluid-mechanics data. The React and TypeScript interface is backed by a Python API using FastAPI, `h5rdmtoolbox` (built on h5py), RDFLib, and SHACL.
 
 **Version 0.1.0-beta.1 — Beta.** This version is intended for evaluation and feedback. Features and interfaces may change, and bugs are still expected.
 
@@ -49,7 +49,7 @@ Connect round ports to describe its origin or context, for example **DAQ → gen
 
 The [PROV-O](https://www.w3.org/TR/prov-o/) export represents generation as an acquisition activity that `prov:used` the DAQ equipment. The CSV dataset and distribution link to that activity through `prov:wasGeneratedBy`. Each mapped HDF5 dataset has `prov:wasDerivedFrom` the CSV dataset; its import activity records the CSV distribution, zero-based column index, and configured column name.
 
-Choose **Metadata .ttl** in Generated Artifacts to download these declared RDF statements. Both HDF5 template and populated-file exports also contain them in `/__design__/metadata_ttl`, alongside the saved blueprint. The declarations describe the modeled lineage and do not independently establish which instrument produced an uploaded file. HDF5/SHACL validation continues to check the original structure and configured metadata contract; files without the optional provenance document remain validatable. The **Download .ttl** action still exports SHACL constraints.
+Choose **Metadata .ttl** in Generated Artifacts to download these declared RDF statements. HDF5 template and populated-file exports write semantic annotations onto their HDF5 objects and attributes with `h5rdmtoolbox`; its RDF serializer can reconstruct the declared graph and the metadata mapped to those objects. The saved blueprint remains under `/__design__`. The declarations describe modeled lineage and do not independently establish which instrument produced an uploaded file. HDF5/SHACL validation continues to check the original structure and configured metadata contract; files without RDF annotations remain validatable. The **Download .ttl** action still exports SHACL constraints.
 
 ## Project status and scope
 

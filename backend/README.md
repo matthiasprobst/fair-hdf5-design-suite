@@ -41,7 +41,7 @@ Python integrations import `fair_hdf5.catalog` for catalog/demo data and
 - `repositories` defines the storage protocol; `library` implements immutable file storage, caching, locking, and atomic revision checks.
 - `catalog`, `profiles`, and `vocabulary` provide seed definitions and shared profile access.
 - `profile_schema` compiles supported SHACL form fields; `profile_bundles` resolves pinned dependencies and bounds explicit network imports.
-- `hdf5` handles file generation, uploaded files, and structural checks; `semantic` projects metadata to RDF and builds shapes; `engines` executes SHACL validation.
+- `hdf5` handles file generation with `h5rdmtoolbox`, uploaded files, and structural checks; `semantic` projects metadata to RDF and builds shapes; `engines` executes SHACL validation. The toolbox writes RDF annotations onto HDF5 objects and attributes so its serializer can reconstruct the semantic graph.
 - `settings` validates configuration; `errors` contains domain errors; `compat` preserves the legacy function API.
 
 Keep dependencies directed toward the shared rules and storage contracts. HTTP
@@ -97,4 +97,4 @@ Authenticated, CSRF-protected `POST /api/export/rdf` accepts the same blueprint 
 
 Producer/CSV relationships create a `prov:Activity` that `prov:used` the producer equipment/entity; both the dataset and CSV distribution reference it through `prov:wasGeneratedBy`. Column bindings declare target `prov:wasDerivedFrom` and import activities using the source distribution, with `h5:csvColumnIndex` and optional `h5:csvColumnName`. Other modeled relationships retain their declared predicates (or the application metadata namespace); `related_to` uses `dcterms:relation`.
 
-HDF5 materialization embeds the same graph in `/__design__/metadata_ttl` and its scope in the design group's `metadata_note` attribute. This is a declared design graph, including for empty templates, and is deliberately separate from the RDF projection used for file conformance. Do not feed these expected declarations back into validation as evidence that an actual acquisition happened. The existing SHACL export and HDF5 validation contract remain unchanged.
+HDF5 materialization writes the declared graph and the metadata projection as `h5rdmtoolbox` RDF annotations on corresponding HDF5 objects. Resources without a physical design object use supporting groups under `/__design__/rdf_resources`; the toolbox's contextual RDF serialization reconstructs the graph. The design group's `metadata_note` still marks declarations as modeled lineage rather than verified acquisition. These declarations remain separate from the RDF projection used for file conformance. Do not feed them back into validation as evidence that an actual acquisition happened. The separate RDF export and HDF5 validation contract remain unchanged; older files containing `/__design__/metadata_ttl` remain validatable.

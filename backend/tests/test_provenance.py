@@ -1,6 +1,7 @@
 """DCAT dataset/distribution semantics and declared equipment-to-data lineage."""
 
 import io
+import tempfile
 from copy import deepcopy
 
 import h5py
@@ -9,6 +10,7 @@ from fair_hdf5.errors import DesignError
 from fair_hdf5.example_projects import csv_example, example_csv
 from fair_hdf5.project_blueprint import editable_blueprint
 from fair_hdf5.provenance import CSV_MEDIA_TYPE, node_iri
+from fair_hdf5.semantic import rdf_from_hdf5
 from fair_hdf5.services import DesignService
 from fair_hdf5.settings import Settings
 from fair_hdf5.vocabulary import DCAT, H5, META, PROV
@@ -102,24 +104,57 @@ class ProvenanceTests(CatalogTestCase):
             with self.subTest(patch=patch), self.assertRaises(DesignError):
                 self.service.rdf(design)
 
-    def test_metadata_is_embedded_without_creating_a_csv_hdf5_object(self):
-        content = self.service.data_file(
-            self.design, {"csv_measurements": io.BytesIO(example_csv())}
-        )
-        with h5py.File(io.BytesIO(content), "r") as handle:
-            stored = Graph().parse(
-                data=handle["/__design__/metadata_ttl"][()].decode(), format="turtle"
+    def _toolbox_graph(self, content):
+        import h5rdmtoolbox as h5tbx
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as tmp:
+            tmp.write(content)
+            tmp.flush()
+            raw = h5tbx.serialize(
+                tmp.name,
+                format="ttl",
+                structural=False,
+                contextual=True,
+                file_uri="https://example.org/generated-file/",
             )
-            self.assertTrue(isomorphic(stored, self.graph()))
-            self.assertIn("Declared", handle["/__design__"].attrs["metadata_note"])
-            self.assertNotIn("/csv_measurements", handle)
+        graph = Graph().parse(data=raw, format="turtle")
+        graph.remove((None, URIRef("https://schema.org/about"), None))
+        return graph
+
+    def _expected_hdf5_graph(self, content, design):
+        graph = Graph().parse(data=self.service.rdf(design), format="turtle")
+        with h5py.File(io.BytesIO(content), "r") as handle:
+            graph += rdf_from_hdf5(design, handle)
+        return graph
+
+    def test_template_and_populated_file_use_toolbox_rdf_annotations(self):
+        design = self.service.normalize(self.design)
+        template = self.service.template(design)
+        content = self.service.data_file(design, {"csv_measurements": io.BytesIO(example_csv())})
+
+        for exported in (template, content):
+            with self.subTest(populated=exported is content):
+                with h5py.File(io.BytesIO(exported), "r") as handle:
+                    self.assertNotIn("metadata_ttl", handle["/__design__"])
+                    self.assertIn("rdf_resources", handle["/__design__"])
+                    self.assertIn("Declared", handle["/__design__"].attrs["metadata_note"])
+                    self.assertNotIn("/csv_measurements", handle)
+                self.assertTrue(
+                    isomorphic(
+                        self._expected_hdf5_graph(exported, design), self._toolbox_graph(exported)
+                    )
+                )
+
+        with h5py.File(io.BytesIO(content), "r") as handle:
             self.assertEqual(handle["/data/pressure"][:].tolist(), [1.25, 2.5, 3.75])
         self.assertTrue(self.service.validate(self.design, content)["conforms"])
-        # Existing files without the new optional metadata still use the original validation contract.
-        buffer = io.BytesIO(content)
-        with h5py.File(buffer, "r+") as handle:
-            del handle["/__design__/metadata_ttl"]
-        self.assertTrue(self.service.validate(self.design, buffer.getvalue())["conforms"])
+        # Previously generated files with the Turtle payload remain validatable.
+        legacy = io.BytesIO(content)
+        with h5py.File(legacy, "r+") as handle:
+            handle["/__design__"].create_dataset(
+                "metadata_ttl", data=self.service.rdf(self.design), dtype=h5py.string_dtype("utf-8")
+            )
+        self.assertTrue(self.service.validate(self.design, legacy.getvalue())["conforms"])
 
     def test_metadata_endpoint_and_escaped_custom_relations(self):
         self.design["edges"].append(
